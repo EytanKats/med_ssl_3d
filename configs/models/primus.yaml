@@ -1,0 +1,11 @@
+lightning_module#backbone:      
+  _target_: project.models.backbones.Primus
+  embed_dim: "%hidden_size"
+  eva_depth: 16
+  eva_numheads: 12
+  input_channels: 1
+  num_classes: 1
+  input_shape: "%img_size"
+  patch_embed_size: "%patch_size"
+  patch_drop_rate: 0.0
+  classification: True

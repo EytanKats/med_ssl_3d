@@ -1,0 +1,13 @@
+lightning_module#backbone:
+  _target_: project.models.backbones.MaskedVisionTransformerMONAI3D
+  vit:
+    _target_: monai.networks.nets.vit.ViT # Vit-S/4 
+    in_channels: 1
+    img_size: "%img_size"
+    patch_size: "%patch_size"
+    hidden_size: "%hidden_size"
+    mlp_dim: 3072
+    num_layers: 8
+    num_heads: 12
+    proj_type: "conv"
+    classification: True

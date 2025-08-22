@@ -1,0 +1,1 @@
+data_module#train_dataset#dataset#data: "$monai.auto3dseg.datafold_read('/mnt/ssd1/ibro/IDC_SSL_CT/idc_dump_datalist.json', basedir='', key='training')[0]"
