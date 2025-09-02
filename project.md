@@ -24,8 +24,34 @@
 
 ## 👨‍💻 Development
 
-- Data preparation: for the first experiments created dataset of 1000 randomly cropped 128x128x128 patches from the NAKO dataset. Patches are cropped from volumes of water contrast of resolution 1.5x1.5x1.5, trying to have at least 70% of foreground voxels.
-- The normalization of voxel values is very important for the stable training. Without normalization on a very early stage of training the NaN values appears as loss. Implemented normalization using monai.transforms.ScaleIntensityRangePercentilesd.
-- Training is unstable: DINO loss for classification tokens seems to flatten after some time, while IBOT (reconstruction loss) continue to fluctuate.
-  - Assumption: IBOT loss dominates training; solution: reduce IBOT loss coefficient from 1 to 0.3 but it didn't change the behavior.
- 
+## Data Preparation
+- For the first experiments, created a dataset of **1000 randomly cropped 3D patches** of size **128×128×128** from the **NAKO dataset**.  
+- Patches are cropped from **water contrast volumes** with isotropic resolution **1.5×1.5×1.5 mm³**, ensuring at least **70% of voxels are foreground**.  
+
+## Normalization
+- **Normalization of voxel values** is very important for stable training.  
+- Without normalization, **NaN values** appeared in the loss function at a very early stage.  
+- Implemented normalization using:  
+  - [`monai.transforms.ScaleIntensityRangePercentilesd`](https://docs.monai.io/en/stable/transforms.html#scaleintensityrangepercentilesd).  
+
+## Training Instability
+- **Observation:**  
+  - DINO loss (classification tokens) seems to **flatten** after some time.  
+  - IBOT loss (reconstruction) continues to **fluctuate**.  
+
+- **Hypotheses & Attempts:**  
+  1. **IBOT loss dominates training**  
+     - Attempt: reduce IBOT loss coefficient from **1 → 0.3**.  
+     - Result: no improvement, DINO loss still flat.  
+
+  2. **DINO loss applied on small batch & global views only**  
+     - Concern:  
+       - Very small batch of images.  
+       - Global views cropped and resized, not very different, so pushing them apart may be confusing.  
+     - Attempt: restrict cropping scale range to **0.8–1.0**.  
+     - Result: DINO loss no longer flat but **fluctuates without decreasing**.  
+
+  3. **Augmentation interference**  
+     - Attempt: disable augmentations (`Resized scaling`, `Affine`, `Histogram shift`, `Gaussian smoothing`).  
+     - Kept only **masking between teacher and student**.  
+     - Result: under evaluation.
