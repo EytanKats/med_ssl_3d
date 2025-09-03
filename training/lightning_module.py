@@ -77,6 +77,7 @@ class DINOv2_3D_LightningModule(LightningModule):
             ibot_separate_head=ibot_separate_head,
             projection_dim=projection_dim,
             backbone=backbone,
+            freeze_last_layer=self.freeze_last_layer_epochs
         )
 
         # Loss
