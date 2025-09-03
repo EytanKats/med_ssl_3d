@@ -54,4 +54,10 @@
   3. **Augmentation interference**  
      - Attempt: disable augmentations (`Resized scaling`, `Affine`, `Histogram shift`, `Gaussian smoothing`).  
      - Kept only **masking between teacher and student**.  
-     - Result: under evaluation.
+     - Result: DINO loss lower but again fluctuates without further decrease.  
+    
+  4. **Freeze last layer and adjust base learning rate**  
+   - Attempt:  
+     1. Froze last layer of DINO & iBOT heads for 30 epochs (not applied previously) to prevent collapse into uniform embeddings.  
+     2. Increased base learning rate from **0.0002 → 0.01** to account for very small batch sizes where DINO’s scaling rule may not apply.  
+   - Result: After unfreezing the last layer, both DINO and iBOT losses decreased in a more stable manner. However, iBOT loss still shows only limited decrease compared to expectations.
