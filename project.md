@@ -35,29 +35,58 @@
   - [`monai.transforms.ScaleIntensityRangePercentilesd`](https://docs.monai.io/en/stable/transforms.html#scaleintensityrangepercentilesd).  
 
 ## Training Instability
-- **Observation:**  
-  - DINO loss (classification tokens) seems to **flatten** after some time.  
-  - IBOT loss (reconstruction) continues to **fluctuate**.  
 
-- **Hypotheses & Attempts:**  
-  1. **IBOT loss dominates training**  
-     - Attempt: reduce IBOT loss coefficient from **1 → 0.3**.  
-     - Result: no improvement, DINO loss still flat.  
+### **Observation**
+- DINO loss (classification tokens) tends to **flatten** after some time.  
+- IBOT loss (reconstruction) continues to **fluctuate**.  
 
-  2. **DINO loss applied on small batch & global views only**  
-     - Concern:  
-       - Very small batch of images.  
-       - Global views cropped and resized, not very different, so pushing them apart may be confusing.  
-     - Attempt: restrict cropping scale range to **0.8–1.0**.  
-     - Result: DINO loss no longer flat but **fluctuates without decreasing**.  
+---
 
-  3. **Augmentation interference**  
-     - Attempt: disable augmentations (`Resized scaling`, `Affine`, `Histogram shift`, `Gaussian smoothing`).  
-     - Kept only **masking between teacher and student**.  
-     - Result: DINO loss lower but again fluctuates without further decrease.  
-    
-  4. **Freeze last layer and adjust base learning rate**  
-   - Attempt:  
-     1. Froze last layer of DINO & iBOT heads for 30 epochs (not applied previously) to prevent collapse into uniform embeddings.  
-     2. Increased base learning rate from **0.0002 → 0.01** to account for very small batch sizes where DINO’s scaling rule may not apply.  
-   - Result: After unfreezing the last layer, both DINO and iBOT losses decreased in a more stable manner. However, iBOT loss still shows only limited decrease compared to expectations.
+### **Hypotheses & Experiments**
+
+1. **IBOT loss dominates training**  
+   - **Attempt:** Reduced IBOT loss coefficient from **1 → 0.3**.  
+   - **Result:** No improvement, DINO loss remained flat.  
+
+2. **DINO loss with small batch & global views only**  
+   - **Concern:**  
+     - Very small batch size of images.  
+     - Global views cropped/resized are not sufficiently different, making it confusing when pushing them apart.  
+   - **Attempt:** Restricted cropping scale range to **0.8–1.0**.  
+   - **Result:** DINO loss no longer flat, but **fluctuates without decreasing**.  
+
+3. **Augmentation interference**  
+   - **Attempt:** Disabled augmentations (`Resized scaling`, `Affine`, `Histogram shift`, `Gaussian smoothing`), keeping only **masking between teacher and student**.  
+   - **Result:** DINO loss became lower, but continued to fluctuate without further decrease.  
+
+4. **Freeze last layer & adjust base learning rate**  
+   - **Attempt:**  
+     1. Kept augmentations disabled.  
+     2. Froze last layer of DINO & iBOT heads for **4500 steps** (not applied before) to prevent collapse into uniform embeddings.  
+     3. Increased base LR from **0.0002 → 0.01** to better handle very small batch sizes (DINO scaling rule not reliable here).  
+   - **Result:** After unfreezing, both DINO and iBOT losses decreased more stably. However, iBOT loss still showed only **limited decrease** compared to expectations.  
+
+5. **Shorter freeze, restore augmentations, adjust temperature scaling**  
+   - **Attempt:**  
+     1. Kept LR at **0.01** (helpful for convergence).  
+     2. Shortened last-layer freeze to **1500 steps** (longer freeze suspected to limit iBOT convergence).  
+     3. Reintroduced augmentations to make DINO task harder.  
+     4. Extended teacher temperature warm-up from **1500 → 4500 steps** to stabilize early training.  
+   - **Result:** DINO loss plateaued; iBOT loss decreased initially but then **increased again** after some time.  
+
+6. **Cropping size of global views**  
+   - **Attempt:** Restricted global cropping scale range to **0.8–1.0** to reduce confusion.  
+   - **Result:** Both DINO and iBOT losses decreased initially but later **increased again**. Fluctuations at the beginning persisted, even after unfreezing heads.  
+
+7. **Increase patch size**  
+   - **Attempt:** Increased patch size from **8 → 16**.  
+     - Small patches in medical images may be too limited in context, making embeddings unstable.  
+     - Larger patches reduce number of tokens, provide more context, and lower memory consumption.  
+   - **Result:** iBOT loss became lower (expected: fewer patches, more context, better embeddings). However, the same issue persisted—losses eventually **increased again**, and fluctuations remained.  
+
+8. **Increase batch size & train longer**  
+   - **Attempt:**  
+     - Increased batch size (may help reduce fluctuations).  
+     - Extended training steps (loss instability might relate to teacher temperature schedule, requiring more training after max temperature is reached).  
+   - **Result:** Currently **under evaluation**.  
+
