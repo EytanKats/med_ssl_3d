@@ -86,7 +86,21 @@
 
 8. **Increase batch size & train longer**  
    - **Attempt:**  
-     - Increased batch size (may help reduce fluctuations).  
-     - Extended training steps (loss instability might relate to teacher temperature schedule, requiring more training after max temperature is reached).  
-   - **Result:** Currently **under evaluation**.  
+     - Increased batch size (may reduce fluctuations).  
+     - Extended training duration (loss instability might stem from teacher temperature reaching its max value too early).  
+   - **Result:** Both DINO and iBOT losses decreased lower than before, but later in training **both increased again**. iBOT loss fluctuations remained.  
+
+9. **Apply DINO loss on unmasked input**  
+   - **Attempt:**  
+     - Forward pass student twice:  
+       - On **unmasked input** → compute DINO loss.  
+       - On **masked input** → compute iBOT loss.  
+   - **Result:** DINO loss converged well. iBOT loss decreased more than before but still **increased again later**, with persistent fluctuations.  
+
+10. **Teacher update too slow at later stages**  
+    - **Hypothesis:**  
+      - Teacher momentum increased too quickly.  
+      - This caused slow teacher updates while the teacher was still weak, leading to growing discrepancies between teacher and student models and divergence of iBOT loss.  
+    - **Attempt:** Extended training for more epochs.  
+    - **Result:** iBOT convergence improved significantly, but **fluctuations remained**.  
 
