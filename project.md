@@ -104,3 +104,11 @@
     - **Attempt:** Extended training for more epochs.  
     - **Result:** iBOT convergence improved significantly, but **fluctuations remained**.  
 
+11. **Training instability (NaN losses)**  
+   - **Observation:**  
+     - Training sometimes diverges with **NaN losses**, though a few runs manage to converge successfully.  
+   - **Hypothesis:**  
+     - The **base learning rate (0.01)** may be too high for the **AdamW optimizer**, amplifying instabilities and causing divergence.  
+   - **Attempt:**  
+     - Reduced base learning rate from **0.01 → 0.001** to stabilize optimization.  
+   - **Result:** Under evaluation.   
