@@ -136,7 +136,18 @@ class DINOv2_3D_LightningModule(LightningModule):
                 if loss_dict["koleo_loss"] is not None
                 else 0.0,
                 "teacher_temp": loss_dict["teacher_temp"],
-                "global_step": float(self.trainer.global_step),  # Add for debugging
+                "global_step": float(self.trainer.global_step), # Add for debugging
+                "lr": self.trainer.optimizers[0].param_groups[0]['lr'],  # Add for debugging
+                "weight_decay": cosine_schedule(
+                    step=self.trainer.global_step,
+                    max_steps=self.trainer.estimated_stepping_batches,
+                    start_value=0.04,
+                    end_value=0.4),  # Add for debugging,
+                "teacher_momentum": cosine_schedule(
+                    step=self.trainer.global_step,
+                    max_steps=self.trainer.estimated_stepping_batches,
+                    start_value=0.992,
+                    end_value=1.0)
             },
             prog_bar=False,
             sync_dist=True,
@@ -160,6 +171,8 @@ class DINOv2_3D_LightningModule(LightningModule):
             self.batch_size_per_device * self.trainer.world_size / 1024
         )
         lr = self.base_lr * lr_scale
+        print(f'Scaled learning rate to {lr:.6f}')
+
         num_layers = len(self.model.student_backbone.vit.blocks)
 
         def lr_layer(layer_idx: int) -> float:
