@@ -137,8 +137,12 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
         return cls_token, features
 
     def forward_student(self, x, mask=None):
+        # features = self.student_backbone(x, mask=mask)
+        # cls_tokens = features[:, 0]
+
+        cls_tokens = self.student_backbone(x)[:, 0]
         features = self.student_backbone(x, mask=mask)
-        cls_tokens = features[:, 0]
+
         features = features if mask is None else features[mask]
         return cls_tokens, features
 
