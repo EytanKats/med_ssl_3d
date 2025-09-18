@@ -22,27 +22,25 @@
 
 ---
 
-## 👨‍💻 Development
+## 👨‍💻 Development Journal
 
-## Data Preparation
+### Data Preparation
 - For the first experiments, created a dataset of **1000 randomly cropped 3D patches** of size **128×128×128** from the **NAKO dataset**.  
 - Patches are cropped from **water contrast volumes** with isotropic resolution **1.5×1.5×1.5 mm³**, ensuring at least **70% of voxels are foreground**.  
 
-## Normalization
+### Normalization
 - **Normalization of voxel values** is very important for stable training.  
 - Without normalization, **NaN values** appeared in the loss function at a very early stage.  
 - Implemented normalization using:  
   - [`monai.transforms.ScaleIntensityRangePercentilesd`](https://docs.monai.io/en/stable/transforms.html#scaleintensityrangepercentilesd).  
 
-## Training Instability
+### ⚠️ DINOv2 Training Instability Debugging
 
-### **Observation**
+#### 🔍 Observations
 - DINO loss (classification tokens) tends to **flatten** after some time.  
-- IBOT loss (reconstruction) continues to **fluctuate**.  
+- iBOT loss (reconstruction) continues to **fluctuate**.  
 
----
-
-### **Hypotheses & Experiments**
+#### 🧪 Hypotheses & Experiments  <!-- more prominent heading -->
 
 1. **IBOT loss dominates training**  
    - **Attempt:** Reduced IBOT loss coefficient from **1 → 0.3**.  
@@ -106,9 +104,12 @@
 
 11. **Training instability (NaN losses)**  
    - **Observation:**  
-     - Training sometimes diverges with **NaN losses**, though a few runs manage to converge successfully.  
+     - Training occasionally diverges with **NaN losses**, although some runs still reach convergence.  
    - **Hypothesis:**  
-     - The **base learning rate (0.01)** may be too high for the **AdamW optimizer**, amplifying instabilities and causing divergence.  
+     - A **base learning rate of 0.01** may be too aggressive for the **AdamW optimizer**, amplifying numerical instabilities and causing divergence.  
    - **Attempt:**  
-     - Reduced base learning rate from **0.01 → 0.001** to stabilize optimization.  
-   - **Result:** Under evaluation.   
+     - Lowered base learning rate from **0.01 → 0.001** to improve stability.  
+   - **Result:**  
+     - Both **DINO** and **iBOT** losses now converge more steadily, though overall convergence is slower.  
+     - After roughly **170 k steps**, the iBOT loss begins to **increase again**.  
+     - This late-stage rise may stem from the **teacher–student gap widening** as teacher updates slow (high momentum) combined with **limited data**, leaving the teacher insufficiently strong to guide the student effectively.
