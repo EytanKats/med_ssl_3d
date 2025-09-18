@@ -52,14 +52,14 @@ class DINOv2Augmentation3D(nn.Module):
         self.local_view_size = local_view_size
         self.num_local_views = num_local_views
 
-        if self.num_local_views == 0 and min(self.global_view_scale) > 0.4:
-            # TODO: implement a warning
-            message = f"MultiView is disabled because num_local_views is set to {num_local_views} and \
-            global_view_scale lower bound is > 0.4, i.e. {global_view_scale}. Setting global_view_scale \
-            lower bound to 0.2 to ensure local learning is possible."
-            self.global_view_scale[0] = (
-                sum(self.local_view_scale) / 2 if self.local_view_scale else 0.25
-            )
+        # if self.num_local_views == 0 and min(self.global_view_scale) > 0.4:
+        #     # TODO: implement a warning
+        #     message = f"MultiView is disabled because num_local_views is set to {num_local_views} and \
+        #     global_view_scale lower bound is > 0.4, i.e. {global_view_scale}. Setting global_view_scale \
+        #     lower bound to 0.2 to ensure local learning is possible."
+        #     self.global_view_scale[0] = (
+        #         sum(self.local_view_scale) / 2 if self.local_view_scale else 0.25
+        #     )
 
         self.global_aug = Compose(
             [
