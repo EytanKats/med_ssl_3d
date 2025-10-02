@@ -40,7 +40,7 @@
 - DINO loss (classification tokens) tends to **flatten** after some time.  
 - iBOT loss (reconstruction) continues to **fluctuate**.  
 
-#### 🧪 Hypotheses & Experiments  <!-- more prominent heading -->
+#### 🧪 Hypotheses & Experiments
 
 1. **IBOT loss dominates training**  
    - **Attempt:** Reduced IBOT loss coefficient from **1 → 0.3**.  
@@ -113,3 +113,24 @@
      - Both **DINO** and **iBOT** losses now converge more steadily, though overall convergence is slower.  
      - After roughly **170 k steps**, the iBOT loss begins to **increase again**.  
      - This late-stage rise may stem from the **teacher–student gap widening** as teacher updates slow (high momentum) combined with **limited data**, leaving the teacher insufficiently strong to guide the student effectively.
+
+
+### 🦖 Using the DINOReg Approach for Zero-Shot Registration
+
+- **Overview of the DINOReg approach**:
+  - The outputs of the pre-trained model for both moving and fixed images are concatenated.  
+  - A dimensionality reduction method (e.g., PCA) is applied to reduce the number of features (e.g., to 12).  
+  - The features of the moving and fixed images are reshaped and resized to match the original image dimensions.  
+  - The **ConvexAdam** algorithm is applied to the resulting feature maps to obtain the deformation field.  
+
+- **Key considerations**:
+  - The accuracy of the deformation is highly dependent on the resolution of the feature maps produced by the model.  
+  - When the output resolution is low, precise image alignment is difficult. For instance, patch sizes of 14 or 16 often result in suboptimal performance.  
+
+- **Limitations and workaround**:
+  - A common solution (used in the original DINOReg) is to upsample the image before feeding it into the model.  
+  - However, this approach significantly increases memory consumption and does not scale well.  
+
+- **Suggested improvement**:
+  - Employ the **SegFormer architecture**, which computes attention across multiscale volumetric features.  
+  - It uses a lightweight all-MLP decoder to efficiently aggregate local and global attention, enabling the generation of effective dense feature representations. 
