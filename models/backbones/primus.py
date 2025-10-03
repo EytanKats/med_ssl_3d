@@ -1,5 +1,5 @@
 from dynamic_network_architectures.architectures.primus import Primus as _Primus
-from dynamic_network_architectures.building_blocks.eva import Eva
+from models.backbones.core.eva import Eva
 from timm.layers import RotaryEmbeddingCat
 import torch
 from torch import nn
