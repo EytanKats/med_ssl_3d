@@ -69,6 +69,7 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
         freeze_last_layer: int = -1,
         projection_dim: int = 65536,
         mask_ratio: float = 0.6,
+        ibot_projection_dim = 8192,
         backbone: nn.Module = None,
     ):
         """
@@ -79,6 +80,8 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
 
         self.norm_last_layer = norm_last_layer
         self.ibot_separate_head = ibot_separate_head
+
+        self.mask_ratio = mask_ratio
 
         self.hidden_size = hidden_size
         self.teacher_backbone = backbone
@@ -113,7 +116,7 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
         if ibot_separate_head:
             teacher_ibot_head = DINOProjectionHead(
                 input_dim=self.hidden_size,
-                output_dim=projection_dim,
+                output_dim=ibot_projection_dim,
                 freeze_last_layer=freeze_last_layer,
                 norm_last_layer=norm_last_layer,
             )
@@ -122,7 +125,7 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
 
             student_ibot_head = DINOProjectionHead(
                 input_dim=self.hidden_size,
-                output_dim=projection_dim,
+                output_dim=ibot_projection_dim,
                 freeze_last_layer=freeze_last_layer,
                 norm_last_layer=norm_last_layer,
             )

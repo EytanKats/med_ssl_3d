@@ -21,6 +21,7 @@ class DINOv2Loss(nn.Module):
         teacher_temp_warmup_epochs: int = 30,
         center_momentum: float = 0.9,
         output_dim: int = 65536,
+        ibot_output_dim: int = 8192,
         ibot_loss_weight: float = 1.0,
         koleo_loss_weight: float = 0.1,
         max_steps: int = 1000,
@@ -33,6 +34,7 @@ class DINOv2Loss(nn.Module):
         self.teacher_temp_warmup_epochs = teacher_temp_warmup_epochs
         self.center_momentum = center_momentum
         self.output_dim = output_dim
+        self.ibot_output_dim = ibot_output_dim
         self.w_ibot = ibot_loss_weight
         self.w_koleo = koleo_loss_weight
         self.max_steps = max_steps
@@ -47,7 +49,7 @@ class DINOv2Loss(nn.Module):
 
         self.ibot_loss_fn = (
             IBOTPatchLoss(
-                output_dim=self.output_dim,
+                output_dim=self.ibot_output_dim,
                 teacher_temp=self.teacher_temp_min,  # Will be updated dynamically
                 student_temp=self.student_temp,
                 center_momentum=self.center_momentum,
