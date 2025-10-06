@@ -18,6 +18,7 @@ class RandomBlockMask3D(nn.Module):
         self,
         ratio_min: float = 0.1,
         ratio_max: float = 0.5,
+        mask_ratio: float = 0.6,
         min_block_size: int = 1,
         max_block_size: Optional[int] = None,
         aspect_ratio_range: Tuple[float, float] = (0.75, 1.25),
@@ -32,6 +33,7 @@ class RandomBlockMask3D(nn.Module):
         super().__init__()
         self.ratio_min = ratio_min
         self.ratio_max = ratio_max
+        self.mask_ratio = mask_ratio
         self.min_block_size = min_block_size
         self.max_block_size = max_block_size
         self.aspect_ratio_range = aspect_ratio_range
@@ -55,7 +57,7 @@ class RandomBlockMask3D(nn.Module):
         """
         if self.mode == "advanced":
             # Use advanced block masking strategy
-            return self.advanced_block_mask(size, mask_ratio=0.75, device=device)
+            return self.advanced_block_mask(size, mask_ratio=self.mask_ratio, device=device)
         else:
             # Default to simple block masking
             return self.simple_block_mask(size, device)
@@ -130,24 +132,28 @@ class RandomBlockMask3D(nn.Module):
 
         masks = []
         for batch_idx in range(B):
-            mask = torch.zeros((D, H, W), dtype=torch.bool, device=device)
-            current_masked = 0
 
-            for _ in range(50):  # Max attempts to prevent infinite loops
-                if current_masked >= target_masked:
-                    break
+            mask = torch.rand(H, W, D).to(device=device)
+            mask = mask < mask_ratio
 
-                remaining = target_masked - current_masked
-                target_patches = self._get_target_patches(remaining)
-
-                # Calculate 3D block dimensions from target patches
-                block_dims = self._calculate_3d_block_dims(target_patches)
-                block_dims = self._apply_size_constraints(block_dims, D, H, W)
-
-                # Try to place block
-                if self._try_place_block(mask, block_dims, D, H, W):
-                    new_masked = block_dims[0] * block_dims[1] * block_dims[2]
-                    current_masked += new_masked
+            # mask = torch.zeros((D, H, W), dtype=torch.bool, device=device)
+            # current_masked = 0
+            #
+            # for _ in range(50):  # Max attempts to prevent infinite loops
+            #     if current_masked >= target_masked:
+            #         break
+            #
+            #     remaining = target_masked - current_masked
+            #     target_patches = self._get_target_patches(remaining)
+            #
+            #     # Calculate 3D block dimensions from target patches
+            #     block_dims = self._calculate_3d_block_dims(target_patches)
+            #     block_dims = self._apply_size_constraints(block_dims, D, H, W)
+            #
+            #     # Try to place block
+            #     if self._try_place_block(mask, block_dims, D, H, W):
+            #         new_masked = block_dims[0] * block_dims[1] * block_dims[2]
+            #         current_masked += new_masked
 
             masks.append(mask)
 

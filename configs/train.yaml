@@ -46,6 +46,7 @@ lightning_module:
     teacher_temp_max: 0.07
     freeze_last_layer_epochs: 30
     projection_dim: 65536
+    mask_ration: 0.6
     weight_decay: 0.04
     backbone:
 
