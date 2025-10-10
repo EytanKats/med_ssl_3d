@@ -115,22 +115,49 @@
      - This late-stage rise may stem from the **teacher–student gap widening** as teacher updates slow (high momentum) combined with **limited data**, leaving the teacher insufficiently strong to guide the student effectively.
 
 
-### 🦖 Using the DINOReg Approach for Zero-Shot Registration
+### 🦖 Using DINO Features for Registration and Segmentation Evaluation
 
-- **Overview of the DINOReg approach**:
-  - The outputs of the pre-trained model for both moving and fixed images are concatenated.  
-  - A dimensionality reduction method (e.g., PCA) is applied to reduce the number of features (e.g., to 12).  
-  - The features of the moving and fixed images are reshaped and resized to match the original image dimensions.  
-  - The **ConvexAdam** algorithm is applied to the resulting feature maps to obtain the deformation field.  
+#### **Registration Evaluation**
+- The outputs of the pre-trained DINO model for both **moving** and **fixed** images are concatenated.  
+- A **dimensionality reduction** technique (e.g., PCA) is applied to compress the feature space (e.g., to 12 dimensions).  
+- The reduced features are **reshaped and resized** to match the original image dimensions.  
+- The **ConvexAdam** optimization algorithm is then applied to the resulting feature maps to estimate the **deformation field**.
 
-- **Key considerations**:
-  - The accuracy of the deformation is highly dependent on the resolution of the feature maps produced by the model.  
-  - When the output resolution is low, precise image alignment is difficult. For instance, patch sizes of 14 or 16 often result in suboptimal performance.  
+#### **Segmentation Evaluation**
+- The segmentation task typically requires an **adapter module** composed of several **upsampling** or **transpose-convolution** layers.  
+- This adapter usually includes **non-linear activation** layers and is trained specifically for segmentation, either with **frozen** or **trainable** DINO feature extractors.
 
-- **Limitations and workaround**:
-  - A common solution (used in the original DINOReg) is to upsample the image before feeding it into the model.  
-  - However, this approach significantly increases memory consumption and does not scale well.  
+#### **Key Considerations**
+- The **accuracy** of both deformation and segmentation masks depends strongly on the **spatial resolution** of the feature maps produced by the backbone model.  
+- When the feature extractor produces **low-resolution outputs**, accurate alignment and segmentation become difficult.  
+- A common approach for registration (as used in the original DINOReg) is to **upsample the input images** before feature extraction.  
+  - However, this significantly **increases memory consumption**.  
+- In segmentation, performance is often improved by incorporating **non-linear adapters**, which **prevent purely linear evaluation**.
 
-- **Suggested improvement**:
-  - Employ the **SegFormer architecture**, which computes attention across multiscale volumetric features.  
-  - It uses a lightweight all-MLP decoder to efficiently aggregate local and global attention, enabling the generation of effective dense feature representations. 
+#### **Suggested Improvement**
+- Adopt the **SegFormer architecture**, which performs **multi-scale attention** across volumetric feature hierarchies.  
+- It employs a lightweight **all-MLP decoder** to efficiently fuse **local** and **global** representations, enabling high-quality **dense feature generation** for segmentation and registration tasks.
+
+
+### ⚙️ Taming DINO
+
+#### **Using the In-House Pretrained DINOV2 Feature Extractor for Zero-Shot Registration**
+- Initial attempts to apply the **in-house pretrained DINOV2 feature extractor** to the **zero-shot registration** task (following the DINOReg approach) resulted in **poor performance** compared to **2D DINO** and **MIND** features.  
+- The main reasons for this were:  
+  - The **dynamic image size** functionality was **not implemented** in the PRIMUS (DKFZ) architecture, preventing upsampling-based inference (as done in the original DINOReg).  
+  - The **feature quality** remained sensitive to **instabilities in the iBOT loss**, as revealed during training investigations.  
+
+#### **DINO — a Sensitive Creature with Many Moving Parts**
+- The DINO training process involves several hyperparameters that **evolve dynamically** during training:  
+  - **Learning rate:** varies across transformer blocks; follows **linear warm-up** followed by a **cosine decay**.  
+  - **Weight decay:** increases from **0.04 → 0.4** following a **cosine schedule**.  
+  - **Teacher momentum:** increases from **0.992 → 1.0** using a **cosine schedule**.  
+  - **Teacher temperature:** rises from **0.04 → 0.07** following a **linear schedule**.  
+    - Although this change seems minor, it turned out to be a **major source of instability** and **feature collapse**.  
+    - Slowing down the temperature increase during training **stabilized convergence** and allowed the model to **match the performance of the 2D DINO** at the same resolution.  
+
+#### **Bug Fixes and Improvements in the DINO 3D Implementation**
+- The **masking ratio** was previously hardcoded to a very low value; adjusted to **30–60%**.  
+- The **dynamic image size** support was implemented by enabling **interpolation of absolute positional embeddings**, allowing flexible input dimensions.  
+- The **iBOT loss** had been incorrectly adapted from a 2D implementation — it used **wrong sample weights** that didn’t account for the number of masked patches in 3D implementation; this was **fixed**.  
+- The **rapid increase** in teacher temperature was found to cause **training instability** and **feature collapse**; **slowing down** this change led to **significant stability improvements** and better overall performance.  
