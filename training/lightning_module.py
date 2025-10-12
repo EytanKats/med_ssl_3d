@@ -49,7 +49,8 @@ class DINOv2_3D_LightningModule(LightningModule):
         freeze_last_layer_epochs: int = 1,
         projection_dim: int = 65536,
         ibot_projection_dim: int = 8192,
-        mask_ratio: float = 0.6,
+        mask_ratio_min: float = 0.6,
+        mask_ratio_max: float = 0.8,
         backbone: nn.Module = None,
     ) -> None:
         """
@@ -79,7 +80,8 @@ class DINOv2_3D_LightningModule(LightningModule):
             ibot_separate_head=ibot_separate_head,
             projection_dim=projection_dim,
             ibot_projection_dim=ibot_projection_dim,
-            mask_ratio=mask_ratio,
+            mask_ratio_min=mask_ratio_min,
+            mask_ratio_max=mask_ratio_max,
             backbone=backbone,
             freeze_last_layer=self.freeze_last_layer_epochs
         )

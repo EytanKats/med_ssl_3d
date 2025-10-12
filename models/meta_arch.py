@@ -81,7 +81,8 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
         self.norm_last_layer = norm_last_layer
         self.ibot_separate_head = ibot_separate_head
 
-        self.mask_ratio = mask_ratio
+        self.mask_ratio_min = mask_ratio_min
+        self.mask_ratio_max = mask_ratio_max
 
         self.hidden_size = hidden_size
         self.teacher_backbone = backbone
@@ -196,7 +197,7 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
             f"Unexpected grid size {H * W * D} ({H}, {W}, {D}) does not match sequence length {sequence_length - 1}"
         )
 
-        block_masker = RandomBlockMask3D(max_block_size=3, mask_ratio=self.mask_ratio)
+        block_masker = RandomBlockMask3D(max_block_size=3, mask_ratio_min=self.mask_ratio_min, mask_ratio_max=self.mask_ratio_max)
         block_mask = block_masker(size=(B, D, H, W), device=device)
         mask[:, 1:] = block_mask.flatten(start_dim=1)
 

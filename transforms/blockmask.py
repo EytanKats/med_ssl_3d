@@ -3,6 +3,7 @@ RandomBlockMask3D: 3D block masking for self-supervised learning (DINOv2-style).
 Supports simple and advanced block masking for volumetric data.
 """
 
+import numpy as np
 from typing import Optional, Tuple, Union
 import torch
 from torch import nn, Tensor
@@ -18,7 +19,8 @@ class RandomBlockMask3D(nn.Module):
         self,
         ratio_min: float = 0.1,
         ratio_max: float = 0.5,
-        mask_ratio: float = 0.6,
+        mask_ratio_min: float = 0.3,
+        mask_ratio_max: float = 0.7,
         min_block_size: int = 1,
         max_block_size: Optional[int] = None,
         aspect_ratio_range: Tuple[float, float] = (0.75, 1.25),
@@ -33,7 +35,8 @@ class RandomBlockMask3D(nn.Module):
         super().__init__()
         self.ratio_min = ratio_min
         self.ratio_max = ratio_max
-        self.mask_ratio = mask_ratio
+        self.mask_ratio_min = mask_ratio_min
+        self.mask_ratio_max = mask_ratio_max
         self.min_block_size = min_block_size
         self.max_block_size = max_block_size
         self.aspect_ratio_range = aspect_ratio_range
@@ -57,7 +60,8 @@ class RandomBlockMask3D(nn.Module):
         """
         if self.mode == "advanced":
             # Use advanced block masking strategy
-            return self.advanced_block_mask(size, mask_ratio=self.mask_ratio, device=device)
+            mask_ratio = np.random.uniform(self.mask_ratio_min, self.mask_ratio_max)
+            return self.advanced_block_mask(size, mask_ratio=mask_ratio, device=device)
         else:
             # Default to simple block masking
             return self.simple_block_mask(size, device)
