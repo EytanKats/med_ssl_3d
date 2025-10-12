@@ -3,28 +3,27 @@ PyTorch LightningModule for 3D DINOv2 self-supervised training.
 Handles optimizer, scheduler, training/validation steps, and teacher-student updates.
 """
 
-from __future__ import annotations
-
-import copy
-import math
 import re
-from functools import partial
-from typing import Any
+import math
+import wandb
+import numpy as np
+import matplotlib.pyplot as plt
+from skimage.transform import resize
+
 import torch
 from torch import nn
-from pytorch_lightning import LightningModule
 from torch import Tensor
 from torch.optim import AdamW, Optimizer
+from pytorch_lightning import LightningModule
 
-from lightly.utils.benchmarking import OnlineLinearClassifier
 from lightly.utils.optim import update_param_groups
-from lightly.utils.scheduler import (
-    CosineWarmupScheduler,
-    cosine_schedule,
-)
+from lightly.utils.scheduler import CosineWarmupScheduler, cosine_schedule
 
-from models.meta_arch import DINOv2_3D_Meta_Architecture
 from losses.dino import DINOv2Loss
+from utils.metrics import dice_coeff
+from utils.pca import pca_lowrank_transform
+from utils.convexAdam_3D import  convex_adam_3d_param
+from models.meta_arch import DINOv2_3D_Meta_Architecture
 
 
 class DINOv2_3D_LightningModule(LightningModule):
