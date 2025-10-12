@@ -44,6 +44,9 @@ class Primus(nn.Module):
         classification: bool = False,
     ):
         super().__init__()
+
+        self.patch_size = patch_embed_size
+
         ref_feat_shape = tuple(
             [i // ds for i, ds in zip(input_shape, patch_embed_size)]
         )
@@ -153,7 +156,7 @@ class Primus(nn.Module):
         if self.cls_token is not None:
             x = torch.cat((self.cls_token.expand(B, -1, -1), x), dim=1)
 
-        x, rot_pos_embed = self._pos_embed(x)
+        x, rot_pos_embed, _ = self.vit._pos_embed(x, (W, H, D))
         for blk in self.vit.blocks:
             if self.vit.grad_checkpointing and not torch.jit.is_scripting():
                 x = checkpoint(blk, x, rope=rot_pos_embed)
