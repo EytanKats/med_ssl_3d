@@ -281,7 +281,7 @@ class Eva(nn.Module):
         init_values: Optional[float] = None,
         use_abs_pos_emb: bool = True,
         use_rot_pos_emb: bool = True,
-        dynamic_img_size: bool = False,
+        dynamic_img_size: bool = True,
         ref_feat_shape: Optional[Tuple[int, ...]] = None,  # 224/14
         num_reg_tokens: int = 0,
         rope_impl=RotaryEmbeddingCat,
@@ -334,8 +334,8 @@ class Eva(nn.Module):
                 assert rope_dim % 4 == 0, "rope dim must be divisible by 4"
             else:
                 rope_dim = embed_dim // num_heads
-            self.rope = rope_impl(
-                rope_dim, in_pixels=False, feat_shape=ref_feat_shape, ref_feat_shape=ref_feat_shape, **rope_kwargs
+            self.rope = rope_impl( # rope_dim, in_pixels=False, feat_shape=ref_feat_shape, ref_feat_shape=ref_feat_shape, **rope_kwargs
+                rope_dim, in_pixels=False, ref_feat_shape=ref_feat_shape, **rope_kwargs
             )
         else:
             self.rope = None
@@ -372,6 +372,34 @@ class Eva(nn.Module):
 
         self.fix_init_weight()
 
+
+    def resample_abs_pos_embed_3d(self, new_dhw):
+
+        """
+        Resamples a 3D absolute position embedding to match new spatial resolution.
+        Args:
+            new_hw: tuple of (new_D, new_H, new_W)
+        Returns:
+            New position embedding of shape (1, new_H*new_W + num_prefix_tokens, dim)
+        """
+        if self.num_prefix_tokens > 0:
+            prefix_tokens = self.pos_embed[:, :self.num_prefix_tokens]
+            pos_tokens = self.pos_embed[:, self.num_prefix_tokens:]
+        else:
+            prefix_tokens, pos_tokens = None, self.pos_embed
+
+        dim = pos_tokens.shape[-1]
+        old_hw = int(np.cbrt(pos_tokens.shape[1]))
+        pos_tokens = pos_tokens.reshape(1, old_hw, old_hw, old_hw, dim).permute(0, 4, 1, 2, 3)
+        pos_tokens = F.interpolate(pos_tokens, size=new_dhw, mode='trilinear', align_corners=False)
+        pos_tokens = pos_tokens.permute(0, 2, 3, 4, 1).reshape(1, new_dhw[0] * new_dhw[1] * new_dhw[2], dim)
+
+        if prefix_tokens is not None:
+            pos_embed = torch.cat([prefix_tokens, pos_tokens], dim=1)
+        else:
+            pos_embed = pos_tokens
+        return pos_embed
+
     def fix_init_weight(self):
         def rescale(param, layer_id):
             param.div_(math.sqrt(2.0 * layer_id))
@@ -403,20 +431,13 @@ class Eva(nn.Module):
         )
         return matcher
 
-    def _pos_embed(self, x) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    def _pos_embed(self, x, new_size) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         if self.dynamic_img_size:
-            raise NotImplementedError("dynamic_img_size is not implemented at the moment")
-            B, H, W, C = x.shape
             if self.pos_embed is not None:
-                pos_embed = resample_abs_pos_embed_3d(
-                    self.pos_embed,
-                    (H, W),
-                    num_prefix_tokens=self.num_prefix_tokens,
-                )
+                pos_embed = self.resample_abs_pos_embed_3d(new_size)
             else:
                 pos_embed = None
-            x = x.view(B, -1, C)
-            rot_pos_embed = self.rope.get_embed(shape=(H, W)) if self.rope is not None else None
+            rot_pos_embed = self.rope.get_embed(shape=new_size) if self.rope is not None else None
         else:
             pos_embed = self.pos_embed
             rot_pos_embed = self.rope.get_embed() if self.rope is not None else None
