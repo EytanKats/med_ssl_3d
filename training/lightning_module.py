@@ -164,14 +164,135 @@ class DINOv2_3D_LightningModule(LightningModule):
     def validation_step(
         self, batch: tuple[Tensor, Tensor, list[str]], batch_idx: int
     ) -> Tensor:
-        images, targets = batch[0], batch[1]
-        cls_token = self.model.teacher_backbone(images)
-        return cls_token
+
+        fix_arr = batch[0:1][0:1]
+        mov_arr = batch[1:2][0:1]
+        fix_lbs = batch[2:3][0:1]
+        mov_lbs = batch[3:4][0:1]
+
+        # model_from_ckpt = DINOv2_3D_LightningModule.load_from_checkpoint("/home/eytan/storage/staff/eytankats/projects/medssl3d/experiments/dinov2_pretrain_primus_freeze0_patchsize16_batch6_lr0.001_momentum150K0.992-0998_steps500K_iBOT3Donly_proj65536_tempwarmup150K/checkpoints/model_epoch=849.ckpt")
+        # self.model = model_from_ckpt.model
+
+        OFD, OFH, OFW = fix_arr.shape[2], fix_arr.shape[3], fix_arr.shape[4]
+        OMD, OMH, OMW = fix_arr.shape[2], fix_arr.shape[3], fix_arr.shape[4]
+        scale_factor = 2
+
+        # fix_arr = nn.functional.interpolate(fix_arr, size=(OFD * scale_factor, OFH * scale_factor, OFW * scale_factor), mode="trilinear", align_corners=False)
+        # mov_arr = nn.functional.interpolate(mov_arr, size=(OMD * scale_factor, OMH * scale_factor, OMW * scale_factor), mode="trilinear", align_corners=False)
+
+        # fix_arr = resize(fix_arr.squeeze().cpu(), (OFD * scale_factor, OFH * scale_factor, OFW * scale_factor), anti_aliasing=True)
+        # mov_arr = resize(mov_arr.squeeze().cpu(), (OFD * scale_factor, OFH * scale_factor, OFW * scale_factor), anti_aliasing=True)
+        # fix_arr = torch.from_numpy(fix_arr).unsqueeze(0).unsqueeze(0).cuda()
+        # mov_arr = torch.from_numpy(mov_arr).unsqueeze(0).unsqueeze(0).cuda()
+
+        FD, FH, FW = fix_arr.shape[2], fix_arr.shape[3], fix_arr.shape[4]
+        MD, MH, MW = mov_arr.shape[2], mov_arr.shape[3], mov_arr.shape[4]
+
+        patch_size = self.model.student_backbone.patch_size
+        PFD, PFH, PFW = FD // patch_size[0], FH // patch_size[1], FW // patch_size[1]
+        PMD, PMH, PMW = MD // patch_size[0], MH // patch_size[1], MW // patch_size[1]
+
+        # calculate initial dice
+        dice = dice_coeff(mov_lbs.contiguous(), fix_lbs.contiguous(), 5)
+        print(f"\nInitial dice: {dice.mean().item()}")
+
+        fix_feature = self.model.student_backbone(fix_arr).squeeze().cpu().numpy()
+        mov_feature = self.model.student_backbone(mov_arr).squeeze().cpu().numpy()
+
+        all_features = np.concatenate((mov_feature[1:, :], fix_feature[1:, :]), axis=0)
+
+        # PCA with 3 channels for visualization
+        reduced_patches, eigenvalues = pca_lowrank_transform(all_features, 3)
+
+        mov_pca = reduced_patches[:PMD * PMH * PMW, :]
+        fix_pca = reduced_patches[PMD * PMH * PMW:, :]
+        mov_pca = mov_pca.reshape([PMD, PMH, PMW, -1])
+        fix_pca = fix_pca.reshape([PFD, PFH, PFW, -1])
+
+        # mov_pca_rescaled = resize(mov_pca, (OMD, OMH, OMW, 3), anti_aliasing=True)
+        # fix_pca_rescaled = resize(fix_pca, (OFD, OFH, OFW, 3), anti_aliasing=True)
+
+        fix_pca = fix_pca.unsqueeze(0).permute(0, 4, 1, 2, 3).cuda()
+        mov_pca = mov_pca.unsqueeze(0).permute(0, 4, 1, 2, 3).cuda()
+        fix_pca_rescaled = nn.functional.interpolate(fix_pca, size=(OFD, OFH, OFW), mode="trilinear", align_corners=False)
+        mov_pca_rescaled = nn.functional.interpolate(mov_pca, size=(OMD, OMH, OMW), mode="trilinear", align_corners=False)
+        fix_pca_rescaled = fix_pca_rescaled.permute(0, 2, 3, 4, 1).squeeze().cpu()
+        mov_pca_rescaled = mov_pca_rescaled.permute(0, 2, 3, 4, 1).squeeze().cpu()
+
+        mov_pca_rescaled = (mov_pca_rescaled - mov_pca_rescaled.min()) / (mov_pca_rescaled.max() - mov_pca_rescaled.min())
+        fix_pca_rescaled = (fix_pca_rescaled - fix_pca_rescaled.min()) / (fix_pca_rescaled.max() - fix_pca_rescaled.min())
+
+        # Create matplotlib figure
+        fig, ax = plt.subplots(1, 2, figsize=(10, 4))
+        ax[0].imshow(mov_pca_rescaled[:, :, OMW // 2])
+        ax[0].set_title(f"Moving features")
+        ax[1].imshow(fix_pca_rescaled[:, :, OFW // 2])
+        ax[1].set_title(f"Fixed features")
+        plt.tight_layout()
+
+        # Convert to numpy image
+        self.logger.experiment.log({"val/pca_3_channels": wandb.Image(fig)})
+        plt.close(fig)
+
+        # PCA with 12 channels for registration
+        reduced_patches, eigenvalues = pca_lowrank_transform(all_features, 12)
+
+        mov_pca = reduced_patches[:PMD*PMH*PMW, :]
+        fix_pca = reduced_patches[PMD*PMH*PMW:, :]
+        mov_pca = mov_pca.reshape([PMD, PMH, PMW, -1])
+        fix_pca = fix_pca.reshape([PFD, PFH, PFW, -1])
+
+        # mov_pca_rescaled = resize(mov_pca, (OMD, OMH, OMW, 12), anti_aliasing=True)
+        # fix_pca_rescaled = resize(fix_pca, (OFD, OFH, OFW, 12), anti_aliasing=True)
+
+        fix_pca = fix_pca.unsqueeze(0).permute(0, 4, 1, 2, 3).cuda()
+        mov_pca = mov_pca.unsqueeze(0).permute(0, 4, 1, 2, 3).cuda()
+        fix_pca_rescaled = nn.functional.interpolate(fix_pca, size=(OFD, OFH, OFW), mode="trilinear", align_corners=False)
+        mov_pca_rescaled = nn.functional.interpolate(mov_pca, size=(OMD, OMH, OMW), mode="trilinear", align_corners=False)
+        fix_pca_rescaled = fix_pca_rescaled.permute(0, 2, 3, 4, 1).squeeze().cpu().numpy()
+        mov_pca_rescaled = mov_pca_rescaled.permute(0, 2, 3, 4, 1).squeeze().cpu().numpy()
+
+        # mov_pca_rescaled = (mov_pca_rescaled - mov_pca_rescaled.min()) / (mov_pca_rescaled.max() - mov_pca_rescaled.min())
+        # fix_pca_rescaled = (fix_pca_rescaled - fix_pca_rescaled.min()) / (fix_pca_rescaled.max() - fix_pca_rescaled.min())
+
+        """ConvexAdam optimization"""
+        print('\nStarting ConvexAdam optimization')
+
+        grid_sp_adam = 2
+        smooth_weight = 2
+        num_iter = 1000
+        lr = 3
+        iter_smooth_kernel = 7
+        iter_smooth_num = 5
+        final_upsample = 1
+
+        with torch.enable_grad():
+            disp, dice = convex_adam_3d_param(
+                fix_pca_rescaled,
+                mov_pca_rescaled,
+                fix_lbs,
+                mov_lbs,
+                loss_func="SSD",
+                grid_sp_adam=grid_sp_adam,
+                lambda_weight=smooth_weight,
+                selected_niter=num_iter,
+                lr=lr,
+                disp_init=None,
+                iter_smooth_kernel=iter_smooth_kernel,
+                iter_smooth_num=iter_smooth_num,
+                end_smooth_kernel=1,
+                final_upsample=final_upsample
+            )
+
+        self.log("val_dice", dice.mean().item(), prog_bar=True, on_step=False, on_epoch=True)
+
+        return dice.mean()
 
     def forward(self, x: Tensor) -> Tensor:
         return self.model(x)
 
     def configure_optimizers(self):
+
         # Calculate learning rate based on batch size
         lr_scale = math.sqrt(
             self.batch_size_per_device * self.trainer.world_size / 1024
