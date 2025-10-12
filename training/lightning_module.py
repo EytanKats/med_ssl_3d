@@ -50,6 +50,8 @@ class DINOv2_3D_LightningModule(LightningModule):
         ibot_projection_dim: int = 8192,
         mask_ratio_min: float = 0.6,
         mask_ratio_max: float = 0.8,
+        momentum_start_value: float = 0.992,
+        momentum_end_value: float = 0.998,
         backbone: nn.Module = None,
     ) -> None:
         """
@@ -67,6 +69,8 @@ class DINOv2_3D_LightningModule(LightningModule):
         self.teacher_temp_warmup_epochs = teacher_temp_warmup_epochs
         self.teacher_temp_min = teacher_temp_min
         self.teacher_temp_max = teacher_temp_max
+        self.momentum_start_value = momentum_start_value
+        self.momentum_end_value = momentum_end_value
         self.freeze_last_layer_epochs = freeze_last_layer_epochs
         self.metrics = {"train": None, "val": None}
 
@@ -432,7 +436,7 @@ class DINOv2_3D_LightningModule(LightningModule):
 
         # Update teacher - this should work fine in DDP
         self.model.update_teacher(
-            global_step=self.trainer.global_step, max_steps=max_steps
+            global_step=self.trainer.global_step, max_steps=max_steps, start_value=self.start_value, end_value=self.end_value
         )
 
         # Remove manual synchronization - it's causing the hangups

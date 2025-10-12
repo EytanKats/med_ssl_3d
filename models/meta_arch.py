@@ -68,8 +68,9 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
         ibot_separate_head: bool = True,
         freeze_last_layer: int = -1,
         projection_dim: int = 65536,
-        mask_ratio: float = 0.6,
-        ibot_projection_dim = 8192,
+        mask_ratio_min: float = 0.6,
+        mask_ratio_max: float = 0.8,
+        ibot_projection_dim = 65536,
         backbone: nn.Module = None,
     ):
         """
@@ -151,10 +152,10 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
         features = features if mask is None else features[mask]
         return cls_tokens, features
 
-    def update_teacher(self, global_step: int, max_steps: int) -> None:
+    def update_teacher(self, global_step: int, max_steps: int, start_value: int , end_value: int) -> None:
         """Update teacher using EMA with cosine momentum schedule."""
         momentum = cosine_schedule(
-            step=global_step, max_steps=max_steps, start_value=0.992, end_value=1.0
+            step=global_step, max_steps=max_steps, start_value=start_value, end_value=end_value
         )
 
         # Remove problematic device movement logic
