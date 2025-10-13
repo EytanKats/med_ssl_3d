@@ -436,7 +436,7 @@ class DINOv2_3D_LightningModule(LightningModule):
 
         # Update teacher - this should work fine in DDP
         self.model.update_teacher(
-            global_step=self.trainer.global_step, max_steps=max_steps, start_value=self.start_value, end_value=self.end_value
+            global_step=self.trainer.global_step, max_steps=max_steps, start_value=self.momentum_start_value, end_value=self.momentum_end_value
         )
 
         # Remove manual synchronization - it's causing the hangups
