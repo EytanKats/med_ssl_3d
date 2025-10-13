@@ -152,7 +152,7 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
         features = features if mask is None else features[mask]
         return cls_tokens, features
 
-    def update_teacher(self, global_step: int, max_steps: int, start_value: int , end_value: int) -> None:
+    def update_teacher(self, global_step: int, max_steps: int, start_value: float , end_value: float) -> None:
         """Update teacher using EMA with cosine momentum schedule."""
         momentum = cosine_schedule(
             step=global_step, max_steps=max_steps, start_value=start_value, end_value=end_value
