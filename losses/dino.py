@@ -192,6 +192,8 @@ class DINOv2Loss(nn.Module):
         student_outputs = input_dict.get("student_cls_token", None)
         teacher_patches = input_dict.get("teacher_patch_tokens", None)
         student_patches = input_dict.get("student_patch_tokens", None)
+        teacher_patches_backbone = input_dict.get("teacher_patch_tokens_backbone", None)
+        student_patches_backbone = input_dict.get("student_patch_tokens_backbone", None)
         student_glob_cls_token = input_dict.get("student_glob_cls_token", None)
         mask = input_dict.get("mask", None)
         n_local_views = input_dict.get("n_local_views", 0)
