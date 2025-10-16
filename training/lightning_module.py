@@ -235,7 +235,7 @@ class DINOv2_3D_LightningModule(LightningModule):
         plt.tight_layout()
 
         # Convert to numpy image
-        self.logger.experiment.log({"val/pca_3_channels": wandb.Image(fig)})
+        self.logger.experiment.log({f'val/pca_3_channels_{batch_idx}': wandb.Image(fig)})
         plt.close(fig)
 
         # PCA with 12 channels for registration
