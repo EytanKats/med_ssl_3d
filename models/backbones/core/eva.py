@@ -442,9 +442,9 @@ class Eva(nn.Module):
             pos_embed = self.pos_embed
             rot_pos_embed = self.rope.get_embed() if self.rope is not None else None
 
-        if pos_embed is not None:
-            x = x + pos_embed
-        x = self.pos_drop(x)
+        # if pos_embed is not None:
+        #     x = x + pos_embed
+        # x = self.pos_drop(x)
 
         # obtain shared rotary position embedding and apply patch dropout
         if self.patch_drop is not None:
