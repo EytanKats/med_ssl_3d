@@ -12,6 +12,16 @@ from lightly.utils.scheduler import cosine_schedule
 from lightly.models.utils import update_momentum
 from transforms.blockmask import RandomBlockMask3D
 
+from torchvision.transforms import Compose
+from monai.transforms import (
+    RandHistogramShift,
+    RandGaussianSmooth,
+    RandBiasField,
+    RandScaleIntensity,
+    RandShiftIntensity,
+    RandGaussianNoise,
+)
+
 # References:
 # Thanks to the following repositories that provided the structure and necessary components for this implementation:
 #     https://github.com/facebookresearch/dinov2/blob/main/dinov2/layers
@@ -136,6 +146,18 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
             self.teacher_ibot_head = self.teacher_dino_head
             self.student_ibot_head = self.student_dino_head
 
+        self.intensity_aug = Compose(
+            [
+                RandBiasField(coeff_range=(0.0, 0.5), prob=0.3),
+                RandScaleIntensity(factors=(0.8, 1.2), prob=0.5),
+                RandShiftIntensity(offsets=(-0.1, 0.1), prob=0.5),
+                RandHistogramShift(num_control_points=(5, 15), prob=0.3),
+                RandGaussianNoise(mean=0.0, std=0.05, prob=0.3),
+                RandGaussianSmooth(sigma_x=(0.5, 1.5), prob=0.3)
+            ]
+        )
+
+
     def forward_teacher(self, x, mask=None):
         features = self.teacher_backbone(x)
         cls_token = features[:, 0]
@@ -143,10 +165,13 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
         return cls_token, features
 
     def forward_student(self, x, mask=None):
-        # features = self.student_backbone(x, mask=mask)
-        # cls_tokens = features[:, 0]
 
-        cls_tokens = self.student_backbone(x)[:, 0]
+        for i in range(x.shape[0]):
+            x[i] = self.intensity_aug(x[i])
+
+        features = self.student_backbone(x)
+        cls_tokens = features[:, 0]
+
         features = self.student_backbone(x, mask=mask)
 
         features = features if mask is None else features[mask]
