@@ -18,9 +18,6 @@ from monai.transforms import (
 )
 
 from .random_resized_crop import RandomResizedCrop3D
-from copy import deepcopy
-import torch
-import torch.nn as nn
 
 
 class DINOv2Augmentation3D(nn.Module):
@@ -76,8 +73,6 @@ class DINOv2Augmentation3D(nn.Module):
                 RandomResizedCrop3D(
                     prob=1, size=self.global_view_size, scale=self.global_view_scale
                 ),
-                RandHistogramShift(prob=0.5),
-                RandGaussianSmooth(prob=0.5),
                 SpatialPad(spatial_size=self.global_view_size),
             ]
         )
