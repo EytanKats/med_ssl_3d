@@ -50,6 +50,7 @@ class DINOv2_3D_LightningModule(LightningModule):
         ibot_projection_dim: int = 8192,
         mask_ratio_min: float = 0.6,
         mask_ratio_max: float = 0.8,
+        sampling = 'random',
         momentum_start_value: float = 0.992,
         momentum_end_value: float = 0.998,
         backbone: nn.Module = None,
@@ -85,6 +86,7 @@ class DINOv2_3D_LightningModule(LightningModule):
             ibot_projection_dim=ibot_projection_dim,
             mask_ratio_min=mask_ratio_min,
             mask_ratio_max=mask_ratio_max,
+            sampling=sampling,
             backbone=backbone,
             freeze_last_layer=self.freeze_last_layer_epochs
         )

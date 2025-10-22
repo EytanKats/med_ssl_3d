@@ -51,6 +51,7 @@ lightning_module:
     ibot_projection_dim: 65536
     mask_ratio_min: 0.3
     mask_ratio_max: 0.7
+    sampling: 'entropy'
     weight_decay: 0.04
     backbone:
 

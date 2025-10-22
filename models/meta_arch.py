@@ -4,8 +4,10 @@ Includes teacher/student ViT, DINO/iBOT heads, and update/cancel logic.
 """
 
 import copy
+import random
 import torch
 from torch import nn
+import torch.nn.functional as F
 
 from lightly.models.modules import DINOProjectionHead
 from lightly.utils.scheduler import cosine_schedule
@@ -27,6 +29,73 @@ from monai.transforms import (
 #     https://github.com/facebookresearch/dinov2/blob/main/dinov2/layers
 #     https://github.com/Project-MONAI/VISTA
 #     https://github.com/lightly-ai/lightly/blob/master/benchmarks/imagenet/vitb16/dinov2.py
+
+
+def random_flip_3d(x):
+    flips = [random.choice([True, False]) for _ in range(3)]
+    if flips[0]:
+        x = torch.flip(x, dims=[2])  # depth
+    if flips[1]:
+        x = torch.flip(x, dims=[3])  # height
+    if flips[2]:
+        x = torch.flip(x, dims=[4])  # width
+    return x, flips
+
+
+def undo_flip_3d(x, flips):
+    if flips[2]:
+        x = torch.flip(x, dims=[4])
+    if flips[1]:
+        x = torch.flip(x, dims=[3])
+    if flips[0]:
+        x = torch.flip(x, dims=[2])
+    return x
+
+
+def local_entropy_3d(x, kernel_size=9, eps=1e-6):
+    """
+    Compute local entropy for 3D volumes.
+
+    Args:
+        x: (B, 1, H, W, D) tensor — intensity or single-channel feature map
+        kernel_size: size of local neighborhood for entropy estimation
+    Returns:
+        entropy_map: (B, 1, H, W, D) tensor
+    """
+    B, C, H, W, D = x.shape
+    assert C == 1, "Use single-channel (grayscale/intensity) input."
+
+    # Compute local histogram approximation using local mean and variance
+    patches = F.unfold(
+        x.view(B, 1, H, W * D),  # flatten depth for now
+        kernel_size=kernel_size,
+        padding=kernel_size // 2
+    )  # (B, kernel_size**2, H*W*D)
+
+    # Compute probabilities (soft histogram via softmax)
+    p = F.softmax(patches / (patches.std(dim=1, keepdim=True) + eps), dim=1)
+    entropy = -(p * torch.log(p + eps)).sum(dim=1)
+    entropy = entropy.view(B, 1, H, W, D)
+
+    # Normalize entropy to [0, 1]
+    entropy = (entropy - entropy.amin()) / (entropy.amax() - entropy.amin() + eps)
+    return entropy
+
+
+def entropy_to_mask_prob(entropy_map, min_mask=0.3, max_mask=0.8):
+    """
+    Convert entropy map (0–1) to per-voxel masking probability.
+    High-entropy regions → high mask ratio (maks them),
+    Low-entropy regions → low mask ratio (keep them).
+    """
+    mask_prob = min_mask + (max_mask - min_mask) * entropy_map
+    return mask_prob
+
+
+def sample_entropy_mask(entropy_map, min_mask=0.3, max_mask=0.8):
+    mask_prob = entropy_to_mask_prob(entropy_map, min_mask, max_mask)
+    mask = torch.bernoulli(mask_prob)
+    return mask  # shape (B, 1, H, W, D), 1 = masked
 
 
 def freeze_eval_module(module: nn.Module) -> None:
@@ -81,6 +150,7 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
         mask_ratio_min: float = 0.6,
         mask_ratio_max: float = 0.8,
         ibot_projection_dim = 65536,
+        sampling = 'random',
         backbone: nn.Module = None,
     ):
         """
@@ -94,6 +164,7 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
 
         self.mask_ratio_min = mask_ratio_min
         self.mask_ratio_max = mask_ratio_max
+        self.sampling = sampling
 
         self.hidden_size = hidden_size
         self.teacher_backbone = backbone
@@ -169,12 +240,21 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
         for i in range(x.shape[0]):
             x[i] = self.intensity_aug(x[i])
 
-        features = self.student_backbone(x)
-        cls_tokens = features[:, 0]
+        x, flips = random_flip_3d(x)
 
         features = self.student_backbone(x, mask=mask)
 
-        features = features if mask is None else features[mask]
+        features_3d = features[:, 1:, :].permute(0, 2, 1).view(features.shape[0], 864, 16, 16, 16)
+        features_3d = undo_flip_3d(features_3d, flips)
+        features = features_3d.permute(0, 2, 3, 4, 1).view(features.shape[0], -1, features.shape[-1])
+
+        features = features if mask is None else features[mask[:, 1:]]
+        # features = features if mask is None else features[mask]
+
+        features_no_mask = self.student_backbone(x)
+        cls_tokens = features_no_mask[:, 0]
+
+
         return cls_tokens, features
 
     def update_teacher(self, global_step: int, max_steps: int, start_value: float , end_value: float) -> None:
@@ -223,9 +303,16 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
             f"Unexpected grid size {H * W * D} ({H}, {W}, {D}) does not match sequence length {sequence_length - 1}"
         )
 
-        block_masker = RandomBlockMask3D(max_block_size=3, mask_ratio_min=self.mask_ratio_min, mask_ratio_max=self.mask_ratio_max)
-        block_mask = block_masker(size=(B, D, H, W), device=device)
-        mask[:, 1:] = block_mask.flatten(start_dim=1)
+        if self.sampling == 'random':
+            block_masker = RandomBlockMask3D(max_block_size=3, mask_ratio_min=self.mask_ratio_min, mask_ratio_max=self.mask_ratio_max)
+            block_mask = block_masker(size=(B, D, H, W), device=device)
+            mask[:, 1:] = block_mask.flatten(start_dim=1)
+        elif self.sampling == 'entropy':
+            with torch.no_grad():
+                entropy_map = local_entropy_3d(global_views, kernel_size=9)  # compute texture complexity
+                entropy_map = F.interpolate(entropy_map, size=(D, H, W), mode="trilinear", align_corners=False)
+                block_mask = sample_entropy_mask(entropy_map, min_mask=self.mask_ratio_min, max_mask=self.mask_ratio_max).squeeze(1)
+                mask[:, 1:] = block_mask.flatten(start_dim=1).to(torch.bool)
 
         # Teacher forward
         with torch.no_grad():
@@ -260,7 +347,7 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
             "teacher_patch_tokens": teacher_patch_tokens,
             "student_patch_tokens": student_global_patch_tokens,
             "student_glob_cls_token": student_global_cls_token,
-            "mask": block_mask,
+            "mask": block_mask.to(torch.bool),
             "n_local_views": torch.tensor(len(views) - 2, device=device),
         }
 
