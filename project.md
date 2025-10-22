@@ -156,8 +156,20 @@
     - Although this change seems minor, it turned out to be a **major source of instability** and **feature collapse**.  
     - Slowing down the temperature increase during training **stabilized convergence** and allowed the model to **match the performance of the 2D DINO** at the same resolution.  
 
-#### **Bug Fixes and Improvements in the DINO 3D Implementation**
-- The **masking ratio** was previously hardcoded to a very low value; adjusted to **30–60%**.  
-- The **dynamic image size** support was implemented by enabling **interpolation of absolute positional embeddings**, allowing flexible input dimensions.  
-- The **iBOT loss** had been incorrectly adapted from a 2D implementation — it used **wrong sample weights** that didn’t account for the number of masked patches in 3D implementation; this was **fixed**.  
-- The **rapid increase** in teacher temperature was found to cause **training instability** and **feature collapse**; **slowing down** this change led to **significant stability improvements** and better overall performance.  
+#### **🧩 Bug Fixes and Improvements in the DINO 3D Implementation**
+
+* The **masking ratio** was previously hardcoded to a very low value; updated to a more effective **30–60%** range.
+* Added **dynamic image size support** by enabling **interpolation of absolute positional embeddings**, allowing flexible input resolutions.
+* Corrected the **iBOT loss** adaptation from 2D to 3D — previously, it used **incorrect sample weights** that ignored the number of masked patches.
+* Introduced **intensity augmentations** for the iBOT loss, which **significantly improved zero-shot registration results**.
+* Adapted the **DINO loss** to the changes within the forward pass of the **Meta Architecture** class (⚠️ *needs verification for correctness*).
+* Updated the **masking strategy** to a **random masking approach**, improving training efficiency.
+* Added an **entropy-based masking option** to focus on more informative patches (⚠️ *requires further validation*).
+* Implemented an **equivariance constraint** based on random 3D flips within the iBOT loss to **mitigate spatial feature collapse**.
+* Removed **absolute positional encodings** to further **reduce spatial collapse artifacts**.
+
+#### **⚙️ Training Stability Factors**
+
+* The **rapid increase in teacher temperature** was identified as a key cause of **training instability** and **feature collapse**. Using a **slower, smoother temperature schedule** led to **more stable convergence** and better feature quality.
+* A **high base learning rate (0.01)** contributed to instability and collapse of spatial features. **Reducing it to 0.001** resulted in noticeably **improved feature diversity and robustness**.
+
