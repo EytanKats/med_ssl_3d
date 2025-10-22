@@ -174,4 +174,11 @@ class Primus(nn.Module):
             # Remove register tokens from x
             x = torch.cat((x[:, :start_idx, :], x[:, end_idx:, :]), dim=1)
 
+        # x = rearrange(x[:, 1:, :], "b (w h d) c -> b c w h d", w=W, h=H, d=D)
+        # x = self.up_projection(x)
+        # x = rearrange(x, "b c w h d -> b (w h d) c")
+        #
+        # placeholder_token = torch.randn(1, 1, 128).cuda()
+        # x = torch.cat((placeholder_token.expand(B, -1, -1), x), dim=1)
+
         return x
