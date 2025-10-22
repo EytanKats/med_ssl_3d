@@ -3,16 +3,20 @@ DINOv2Augmentation3D: 3D data augmentation pipeline for DINOv2 self-supervised l
 Includes global/local views, affine, histogram, smoothing, and cropping.
 """
 
+from copy import deepcopy
 from typing import List, Optional, Union, Tuple
+
 import torch
+import torch.nn as nn
 from torchvision.transforms import Compose
+
 from monai.transforms import (
-    EnsureChannelFirst,
     RandAffine,
     RandHistogramShift,
     RandGaussianSmooth,
     SpatialPad,
 )
+
 from .random_resized_crop import RandomResizedCrop3D
 from copy import deepcopy
 import torch
