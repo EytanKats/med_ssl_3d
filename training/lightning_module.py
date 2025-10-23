@@ -176,7 +176,7 @@ class DINOv2_3D_LightningModule(LightningModule):
         fix_lbs = batch[2:3][0:1]
         mov_lbs = batch[3:4][0:1]
 
-        # model_from_ckpt = DINOv2_3D_LightningModule.load_from_checkpoint("/home/eytan/storage/staff/eytankats/projects/medssl3d/experiments/dinov2_pretrain_primus_freeze0_patchsize16_batch6_lr0.001_momentum150K0.992-0998_steps500K_iBOT3Donly_proj65536_tempwarmup150K/checkpoints/model_epoch=849.ckpt")
+        # model_from_ckpt = DINOv2_3D_LightningModule.load_from_checkpoint("/home/eytan/storage/staff/eytankats/projects/medssl3d/experiments/flipaug_woentropy_lr.0001/model_epoch=3199.ckpt")
         # self.model = model_from_ckpt.model
 
         OFD, OFH, OFW = fix_arr.shape[2], fix_arr.shape[3], fix_arr.shape[4]

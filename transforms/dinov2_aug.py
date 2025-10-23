@@ -107,7 +107,7 @@ class DINOv2Augmentation3D(nn.Module):
             List[torch.Tensor]: List containing N augmented tensors for global (2) and local (N-2) views.
         """
         views = []
-        global_views = [self.global_aug(deepcopy(x)) for _ in range(2)]
+        global_views = [self.global_aug(deepcopy(x)) for _ in range(1)] # 2
         views.extend(global_views)
         if self.local_aug is not None:
             local_views = [self.local_aug(x) for _ in range(self.num_local_views)]

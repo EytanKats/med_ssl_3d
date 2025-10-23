@@ -286,7 +286,16 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
         """
         device = views[0].device
 
-        global_views = torch.cat(views[:2])
+        # import matplotlib.pyplot as plt
+        # for view_0, view_1 in zip(views[0], views[1]):
+        #     fig, axes = plt.subplots(1, 2)
+        #     axes[0].imshow(view_0[0, :, :, 64].detach().cpu().numpy(), cmap="gray")
+        #     axes[1].imshow(view_1[0, :, :, 64].detach().cpu().numpy(), cmap="gray")
+        #     plt.show()
+        #     plt.close()
+
+        # global_views = torch.cat(views[:2])
+        global_views = torch.cat(views[:1])
 
         if len(views) > 2:
             local_views = torch.cat(views[2:])
@@ -320,14 +329,14 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
                 global_views, mask=mask
             )
             teacher_cls_token = self.teacher_dino_head(teacher_cls_token)
-            teacher_patch_tokens = self.teacher_ibot_head(teacher_patch_tokens)
+            teacher_patch_tokens_ibot = self.teacher_ibot_head(teacher_patch_tokens)
 
         # Student forward
         student_global_cls_token, student_global_patch_tokens = self.forward_student(
             global_views, mask=mask
         )
         student_global_cls_token = self.student_dino_head(student_global_cls_token)
-        student_global_patch_tokens = self.student_ibot_head(
+        student_global_patch_tokens_ibot = self.student_ibot_head(
             student_global_patch_tokens
         )
 
@@ -344,8 +353,10 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
         out = {
             "teacher_cls_token": teacher_cls_token,
             "student_cls_token": student_cls_token,
-            "teacher_patch_tokens": teacher_patch_tokens,
-            "student_patch_tokens": student_global_patch_tokens,
+            "teacher_patch_tokens_backbone": teacher_patch_tokens,
+            "student_patch_tokens_backbone": student_global_patch_tokens,
+            "teacher_patch_tokens": teacher_patch_tokens_ibot,
+            "student_patch_tokens": student_global_patch_tokens_ibot,
             "student_glob_cls_token": student_global_cls_token,
             "mask": block_mask.to(torch.bool),
             "n_local_views": torch.tensor(len(views) - 2, device=device),
