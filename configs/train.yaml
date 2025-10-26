@@ -47,11 +47,11 @@ lightning_module:
     teacher_temp_min: 0.04
     teacher_temp_max: 0.055  # 0.07
     momentum_start_value: 0.992
-    momentum_end_value: 0.998
-    freeze_last_layer_epochs: 30
-    projection_dim: 65536
-    ibot_projection_dim: 65536
-    mask_ratio_min: 0.3
+    momentum_end_value: 1.0
+    freeze_last_layer_epochs: 0  # 30
+    projection_dim: 8192 # 65536
+    ibot_projection_dim: 8192 # 65536
+    mask_ratio_min: 0.4
     mask_ratio_max: 0.7
     sampling: 'entropy'
     weight_decay: 0.04
