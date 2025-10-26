@@ -1,8 +1,8 @@
 lightning_module#backbone:      
   _target_: project.models.backbones.Primus
   embed_dim: "%hidden_size"
-  eva_depth: 16
-  eva_numheads: 12
+  eva_depth: 8  # 16, 8
+  eva_numheads: 6  # 12, 6
   input_channels: 1
   num_classes: 1
   input_shape: "%img_size"
