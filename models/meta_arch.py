@@ -244,7 +244,8 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
 
         features = self.student_backbone(x, mask=mask)
 
-        features_3d = features[:, 1:, :].permute(0, 2, 1).view(features.shape[0], 864, 16, 16, 16)
+        H, W, D = self.student_backbone.grid_size
+        features_3d = features[:, 1:, :].permute(0, 2, 1).view(features.shape[0], self.hidden_size, H, W, D)
         features_3d = undo_flip_3d(features_3d, flips)
         features = features_3d.permute(0, 2, 3, 4, 1).view(features.shape[0], -1, features.shape[-1])
 
