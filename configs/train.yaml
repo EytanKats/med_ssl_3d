@@ -2,8 +2,8 @@
 project: /home/eytan/projects/medical_ssl_3d
 run_name: "dinov2_pretrain_freezelastlayerfor1500steps_baselr0.001_warmupteacherfor15000steps_globalcrops0.8-0.1_patches16_epochs9000_batch6_maskingbug"
 img_size: [128, 128, 128]
-hidden_size: 864
-patch_size: [16, 16, 16]
+hidden_size: 180 # 864, 180
+patch_size: [4, 4, 4] # [8, 8, 8], [4, 4, 4]
 
 trainer:
   _target_: pytorch_lightning.Trainer
