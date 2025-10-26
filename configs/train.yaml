@@ -30,8 +30,10 @@ trainer:
     - _target_: pytorch_lightning.callbacks.ModelCheckpoint
       dirpath: "$'/home/eytan/storage/staff/eytankats/projects/medssl3d/experiments/' + @run_name + '/checkpoints'"
       filename: "model_{epoch:03d}"
-      save_top_k: -1
-      every_n_epochs: 50
+      monitor: 'val_dice'
+      mode: 'max'
+      save_top_k: 1
+      every_n_epochs: 5
 
 lightning_module:
     _target_: project.training.lightning_module.DINOv2_3D_LightningModule
