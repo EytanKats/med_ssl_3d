@@ -76,30 +76,6 @@ data_module:
               image_only: True
             - _target_: monai.transforms.EnsureChannelFirstd
               keys: ["image"]
-#            - _target_: monai.transforms.Orientationd
-#              keys: [ "image" ]
-#              axcodes: SPL
-#            - _target_: monai.transforms.Spacingd
-#              keys: [ "image" ]
-#              pixdim: [ 1.0, 1.0, 1.0 ]
-#              mode: bilinear
-#            - _target_: monai.transforms.CropForegroundd
-#              keys: [ "image" ]
-#              source_key: "image"
-#            - _target_: monai.transforms.SpatialPadd
-#              keys: [ "image" ]
-#              spatial_size: "%img_size"
-#              value: -1024
-#            - _target_: monai.transforms.ScaleIntensityRanged
-#              keys: [ "image" ]
-#              a_min: -1024
-#              a_max: 2048
-#              b_min: 0
-#              b_max: 1
-#              clip: True
-#            - _target_: monai.transforms.RandSpatialCropd
-#              keys: [ "image" ]
-#              roi_size: "%img_size"
             - _target_: monai.transforms.ScaleIntensityRangePercentilesd
               keys: ["image"]
               lower: 1
