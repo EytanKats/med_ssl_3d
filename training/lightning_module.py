@@ -300,11 +300,13 @@ class DINOv2_3D_LightningModule(LightningModule):
     def configure_optimizers(self):
 
         # Calculate learning rate based on batch size
-        lr_scale = math.sqrt(
-            self.batch_size_per_device * self.trainer.world_size / 1024
-        )
-        lr = self.base_lr * lr_scale
-        print(f'Scaled learning rate to {lr:.6f}')
+        # lr_scale = math.sqrt(
+        #     self.batch_size_per_device * self.trainer.world_size / 1024
+        # )
+        # lr = self.base_lr * lr_scale
+
+        lr = self.base_lr
+        print(f'Initial learning rate is {lr:.6f}')
 
         num_layers = len(self.model.student_backbone.vit.blocks)
 
