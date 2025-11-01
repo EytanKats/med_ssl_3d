@@ -3,11 +3,13 @@ PyTorch LightningModule for 3D DINOv2 self-supervised training.
 Handles optimizer, scheduler, training/validation steps, and teacher-student updates.
 """
 
+import os
 import re
-import math
 import wandb
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
+from scipy.ndimage import map_coordinates
 from skimage.transform import resize
 
 import torch
@@ -20,6 +22,7 @@ from lightly.utils.optim import update_param_groups
 from lightly.utils.scheduler import CosineWarmupScheduler, cosine_schedule
 
 from losses.dino import DINOv2Loss
+from utils.misc import jacobian_metrics
 from utils.metrics import dice_coeff
 from utils.pca import pca_lowrank_transform
 from utils.convexAdam_3D import  convex_adam_3d_param
@@ -53,6 +56,8 @@ class DINOv2_3D_LightningModule(LightningModule):
         sampling = 'random',
         momentum_start_value: float = 0.992,
         momentum_end_value: float = 0.998,
+        ckpt_path: str = '',
+        output_dir: str = '',
         backbone: nn.Module = None,
     ) -> None:
         """
@@ -90,6 +95,35 @@ class DINOv2_3D_LightningModule(LightningModule):
             backbone=backbone,
             freeze_last_layer=self.freeze_last_layer_epochs
         )
+
+        if ckpt_path:
+            ckpt = torch.load(ckpt_path, weights_only=False)
+            new_state_dict = {k.replace("model.", "", 1): v for k, v in ckpt["state_dict"].items()}
+            self.model.load_state_dict(new_state_dict, strict=False)
+
+        self.output_dir = output_dir
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+
+        self.df_results = pd.DataFrame()
+
+        self.kidney_left_dice = []
+        self.kidney_right_dice = []
+        self.liver_dice = []
+        self.spleen_dice = []
+        self.mean_dice = []
+
+        self.init_kidney_left_dice = []
+        self.init_kidney_right_dice = []
+        self.init_liver_dice = []
+        self.init_spleen_dice = []
+        self.init_mean_dice = []
+
+        self.fixed = []
+        self.moving = []
+
+        self.sdjlog = []
+        self.fold_ratio = []
 
         # Loss
         self.criterion = DINOv2Loss(
@@ -176,8 +210,8 @@ class DINOv2_3D_LightningModule(LightningModule):
         fix_lbs = batch[2:3][0:1]
         mov_lbs = batch[3:4][0:1]
 
-        # model_from_ckpt = DINOv2_3D_LightningModule.load_from_checkpoint("/home/eytan/storage/staff/eytankats/projects/medssl3d/experiments/flipaug_woentropy_lr.0001/model_epoch=3199.ckpt")
-        # self.model = model_from_ckpt.model
+        self.fixed.append(os.path.basename(self.trainer.datamodule.val_dataset.dataset.data[batch_idx]["fixed"])[:-7])
+        self.moving.append(os.path.basename(self.trainer.datamodule.val_dataset.dataset.data[batch_idx]["moving"])[:-7])
 
         OFD, OFH, OFW = fix_arr.shape[2], fix_arr.shape[3], fix_arr.shape[4]
         OMD, OMH, OMW = fix_arr.shape[2], fix_arr.shape[3], fix_arr.shape[4]
@@ -201,6 +235,12 @@ class DINOv2_3D_LightningModule(LightningModule):
         # calculate initial dice
         dice = dice_coeff(mov_lbs.contiguous(), fix_lbs.contiguous(), 5)
         print(f"\nInitial dice: {dice.mean().item()}")
+
+        self.init_kidney_left_dice.append(dice[0].item())
+        self.init_kidney_right_dice.append(dice[1].item())
+        self.init_liver_dice.append(dice[2].item())
+        self.init_spleen_dice.append(dice[3].item())
+        self.init_mean_dice.append(dice.mean().item())
 
         fix_feature = self.model.student_backbone(fix_arr).squeeze().cpu().numpy()
         mov_feature = self.model.student_backbone(mov_arr).squeeze().cpu().numpy()
@@ -291,6 +331,50 @@ class DINOv2_3D_LightningModule(LightningModule):
             )
 
         self.log("val_dice", dice.mean().item(), prog_bar=True, on_step=False, on_epoch=True)
+
+        sdjlog, fold_ratio = jacobian_metrics(torch.tensor(disp).permute(3, 0, 1, 2).unsqueeze(0))
+        print(f'SDJLog: {sdjlog}, FoldRatio: {fold_ratio}')
+        self.sdjlog.append(sdjlog)
+        self.fold_ratio.append(fold_ratio)
+
+        self.kidney_left_dice.append(dice[0].item())
+        self.kidney_right_dice.append(dice[1].item())
+        self.liver_dice.append(dice[2].item())
+        self.spleen_dice.append(dice[3].item())
+        self.mean_dice.append(dice.mean().item())
+
+        df = pd.DataFrame(
+            {
+                "init_mean_dice": self.init_mean_dice,
+                "mean_dice": self.mean_dice,
+                "sdjlog": self.sdjlog,
+                "fold_ratio": self.fold_ratio,
+                "init_kidney_left_dice": self.init_kidney_left_dice,
+                "init_kidney_right_dice": self.init_kidney_right_dice,
+                "init_liver_dice": self.init_liver_dice,
+                "init_spleen_dice": self.init_spleen_dice,
+                "kidney_left_dice": self.kidney_left_dice,
+                "kidney_right_dice": self.kidney_right_dice,
+                "liver_dice": self.liver_dice,
+                "spleen_dice": self.spleen_dice
+            }
+        )
+
+        # warp moving image
+        disp = np.moveaxis(disp, 3, 0)
+        mov_arr = mov_arr.cpu().numpy().squeeze()
+        D, H, W = mov_arr.shape[-3], mov_arr.shape[-2], mov_arr.shape[-1]
+        identity = np.meshgrid(np.arange(D), np.arange(H), np.arange(W), indexing='ij')
+        warped_arr = map_coordinates(mov_arr, identity + disp, order=0)
+        warped_lbs = map_coordinates(mov_lbs.cpu().numpy().squeeze(), identity + disp, order=0)
+
+        dice = dice_coeff(torch.Tensor(warped_lbs).unsqueeze(0).unsqueeze(0).contiguous().cuda(), fix_lbs.contiguous(), 5)
+        print(f"\nFinal dice: {dice.mean().item()}")
+
+        if self.output_dir:
+            name = os.path.basename(self.trainer.datamodule.val_dataset.dataset.data[batch_idx]["fixed"])[:-7] + "_" + os.path.basename(self.trainer.datamodule.val_dataset.dataset.data[batch_idx]["moving"])[:-7]
+            np.save(os.path.join(self.output_dir, name + "_warped.npy"), warped_arr)
+            np.save(os.path.join(self.output_dir, name + "_disp.npy"), disp)
 
         return dice.mean()
 
