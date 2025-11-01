@@ -8,10 +8,12 @@ import nibabel as nib
 from scipy.ndimage import binary_opening
 
 
-RAW_DATA_PATTERN = '/home/eytan/storage/staff/eytankats/data/nako_10k/images_mri_stitched//**/wat.nii.gz'
-OUTPUT_DIR = '/home/eytan/storage/staff/eytankats/projects/medssl3d/data/npy128_fg80'
+# RAW_DATA_PATTERN = '/home/eytan/storage/staff/eytankats/data/nako_10k/images_mri_stitched//**/wat.nii.gz'
+# RAW_DATA_PATTERN = '/home/eytan/storage/datasets/TotalSegmentatorV2//**/ct.nii.gz'
+RAW_DATA_PATTERN = '/home/eytan/storage/staff/eytankats/data/total_segmentator_mri//**/mri.nii.gz'
+OUTPUT_DIR = '/home/eytan/storage/staff/eytankats/projects/medssl3d/data/npy128_ts_mri'
 DATASET_FILE_NAME = 'dataset.json'
-MAX_PATCH_NUM = 1000
+MAX_PATCH_NUM = 3000
 PATCH_SIZE = (128, 128, 128)
 MIN_FG_RATIO = 0.7
 
@@ -36,7 +38,9 @@ def random_foreground_crop(image, mask, patch_size, min_fg_ratio=0.8, max_tries=
 
     D, H, W = image.shape
     d, h, w = patch_size
-    assert d <= D and h <= H and w <= W, "Patch size must fit inside image."
+    if d >= D or h >= H or w >= W:
+        print(f'Warning: Patch size must fit inside image. Patch size: {d}, {h}, {w}. Image size: {D}, {H}, {W}')
+        return None, None, None, None
 
     best_fg_ratio = 0
     for _ in range(max_tries):
@@ -97,7 +101,7 @@ for _ in range(MAX_PATCH_NUM):
     img_np_resampled = img_t_resampled.squeeze().numpy()
 
     # get foreground mask
-    img_np_normalized = img_np_resampled / np.max(img_np_resampled)
+    img_np_normalized = (img_np_resampled - np.min(img_np_resampled)) / (np.max(img_np_resampled) - np.min(img_np_resampled))
     non_zero_mask = img_np_normalized > 0.02
     non_zero_mask = binary_opening(non_zero_mask, iterations=5) # clean nonzero mask by morphological opening
 
@@ -105,6 +109,10 @@ for _ in range(MAX_PATCH_NUM):
     patch, start_d, start_h, start_w = random_foreground_crop(img_np_resampled, non_zero_mask, patch_size=PATCH_SIZE, min_fg_ratio=MIN_FG_RATIO)
     if patch is None:
         continue
+
+    # import matplotlib.pyplot as plt
+    # plt.imshow(patch[:, :, 64], cmap='gray')
+    # plt.show()
 
     # save patch
     patch_path = os.path.join(OUTPUT_DIR, f'{os.path.basename(os.path.dirname(img_path))}_{start_d}_{start_h}_{start_w}.npy')
