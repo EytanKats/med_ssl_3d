@@ -56,6 +56,7 @@ class DINOv2_3D_LightningModule(LightningModule):
         sampling = 'random',
         momentum_start_value: float = 0.992,
         momentum_end_value: float = 0.998,
+        apply_gin: bool = False,
         ckpt_path: str = '',
         output_dir: str = '',
         backbone: nn.Module = None,
@@ -93,7 +94,8 @@ class DINOv2_3D_LightningModule(LightningModule):
             mask_ratio_max=mask_ratio_max,
             sampling=sampling,
             backbone=backbone,
-            freeze_last_layer=self.freeze_last_layer_epochs
+            freeze_last_layer=self.freeze_last_layer_epochs,
+            apply_gin=apply_gin
         )
 
         if ckpt_path:

@@ -24,6 +24,8 @@ from monai.transforms import (
     RandGaussianNoise,
 )
 
+from utils.gin import gin_aug
+
 # References:
 # Thanks to the following repositories that provided the structure and necessary components for this implementation:
 #     https://github.com/facebookresearch/dinov2/blob/main/dinov2/layers
@@ -151,6 +153,7 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
         mask_ratio_max: float = 0.8,
         ibot_projection_dim = 65536,
         sampling = 'random',
+        apply_gin = False,
         backbone: nn.Module = None,
     ):
         """
@@ -165,6 +168,8 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
         self.mask_ratio_min = mask_ratio_min
         self.mask_ratio_max = mask_ratio_max
         self.sampling = sampling
+
+        self.apply_gin = apply_gin
 
         self.hidden_size = hidden_size
         self.teacher_backbone = backbone
@@ -239,6 +244,10 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
 
         for i in range(x.shape[0]):
             x[i] = self.intensity_aug(x[i])
+
+            if self.apply_gin:
+                with torch.autocast(device_type="cuda", enabled=False):  # disables autocast
+                    x[i] = gin_aug(x[i].unsqueeze(0).float()).squeeze(0)
 
         x, flips = random_flip_3d(x)
 
