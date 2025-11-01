@@ -137,3 +137,61 @@ def calculate_best_match_patchT(set1, set2, mode='l2'):
         closest_feature = np.argmax(dist, axis=1)
     return closest_feature
 
+
+
+def compute_jacobian_determinant_3d(disp):
+    """
+    Compute Jacobian determinant of a 3D displacement field.
+
+    Args:
+        disp: (B, 3, H, W, D) displacement field in voxel units (torch.Tensor)
+    Returns:
+        detJ: (B, H, W, D) Jacobian determinant
+    """
+    B, C, H, W, D = disp.shape
+    assert C == 3, "Displacement field must have 3 channels (dx, dy, dz)."
+
+    # Compute gradients (central differences)
+    gradx = (disp[:, :, 2:, 1:-1, 1:-1] - disp[:, :, :-2, 1:-1, 1:-1]) / 2
+    grady = (disp[:, :, 1:-1, 2:, 1:-1] - disp[:, :, 1:-1, :-2, 1:-1]) / 2
+    gradz = (disp[:, :, 1:-1, 1:-1, 2:] - disp[:, :, 1:-1, 1:-1, :-2]) / 2
+
+    # Identity + gradient
+    ones = torch.ones_like(gradx[:, 0])
+    J = torch.stack([
+        torch.stack([ones + gradx[:, 0], grady[:, 0], gradz[:, 0]], dim=1),
+        torch.stack([gradx[:, 1], ones + grady[:, 1], gradz[:, 1]], dim=1),
+        torch.stack([gradx[:, 2], grady[:, 2], ones + gradz[:, 2]], dim=1),
+    ], dim=1)  # (B, 3, 3, H-2, W-2, D-2)
+
+    # Determinant
+    detJ = (
+            J[:, 0, 0] * (J[:, 1, 1] * J[:, 2, 2] - J[:, 1, 2] * J[:, 2, 1]) -
+            J[:, 0, 1] * (J[:, 1, 0] * J[:, 2, 2] - J[:, 1, 2] * J[:, 2, 0]) +
+            J[:, 0, 2] * (J[:, 1, 0] * J[:, 2, 1] - J[:, 1, 1] * J[:, 2, 0])
+    )
+    return detJ
+
+
+def jacobian_metrics(disp):
+    """
+    Compute Jacobian-based metrics: sdlogJ and % folding.
+
+    Args:
+        disp: (B, 3, H, W, D) displacement field (torch.Tensor)
+    Returns:
+        dict with 'sdlogJ' and 'fold_percent'
+    """
+    detJ = compute_jacobian_determinant_3d(disp)
+
+    # Mask for positive determinants (valid Jacobians)
+    pos_mask = detJ > 0
+    logJ = torch.log(detJ[pos_mask] + 1e-8)
+    sdlogJ = torch.std(logJ)
+
+    # Folding ratio
+    fold_ratio = torch.mean((detJ < 0).float()) * 100.0
+
+    return sdlogJ.item(), fold_ratio.item()
+
+
