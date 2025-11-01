@@ -1,0 +1,1 @@
+data_module#train_dataset#dataset#data: "$monai.auto3dseg.datafold_read('/home/eytan/storage/staff/eytankats/projects/medssl3d/data/dataset_ssl_nako_tsct_tsmri.json', basedir='/home/eytan/storage/staff/eytankats/projects/medssl3d/data', key='training')[0]"
