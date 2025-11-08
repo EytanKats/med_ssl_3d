@@ -1,0 +1,51 @@
+# IO
+project: /home/eytan/projects/medical_ssl_3d
+labels_file: "/home/eytan/storage/staff/eytankats/projects/medssl3d/data/nako_30/nako_labels.json"
+output_dir: "/home/eytan/storage/staff/eytankats/projects/medssl3d/experiments/results/patch_8/nako_validation_registration"
+save_artifacts: False
+
+# Method
+method: "medssl"
+
+# Features
+features_dir: "/home/eytan/storage/staff/eytankats/projects/medssl3d/experiments/results/patch_8/nako_validation_features"
+patch_size: [8, 8, 8]
+
+# Registration
+use_preregistration: False
+num_iter: 1000
+lr: 0.2
+smooth_weight: 0.5
+disp_hw: 4
+grid_sp: 6
+grid_sp_adam: 4
+iter_smooth_kernel: 3
+iter_smooth_num: 3
+final_upsample: 1
+loss_func: "SSD"
+magnitute_scale: 0.1
+
+# Data loader
+data_module:
+  _target_: project.training.data_module.DataModule
+  num_workers: 4
+  val_dataset:
+    _target_: monai.data.Dataset
+    data:
+    transform:
+      _target_: torchvision.transforms.Compose
+      transforms:
+        - _target_: monai.transforms.LoadImaged
+          keys: ["fixed", "moving" , "label_fixed", "label_moving"]
+          image_only: True
+        - _target_: monai.transforms.EnsureChannelFirstd
+          keys: ["fixed", "moving" , "label_fixed", "label_moving"]
+        - _target_: monai.transforms.ScaleIntensityRangePercentilesd
+          keys: ["fixed", "moving"]
+          lower: 1
+          upper: 99
+          b_min: 0.0
+          b_max: 1.0
+          clip: True
+        - _target_: monai.transforms.ToTensord
+          keys: ["fixed", "moving" , "label_fixed", "label_moving"]
