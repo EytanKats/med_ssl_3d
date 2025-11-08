@@ -62,7 +62,7 @@ class DataModule(pl.LightningDataModule):
             shuffle=False,
             prefetch_factor=1,
             persistent_workers=True,
-            drop_last=self.drop_last,
+            drop_last=False,
         )
 
     def test_dataloader(self):
