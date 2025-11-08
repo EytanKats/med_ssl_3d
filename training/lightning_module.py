@@ -10,7 +10,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.ndimage import map_coordinates
-from skimage.transform import resize
 
 import torch
 from torch import nn
@@ -37,7 +36,7 @@ class DINOv2_3D_LightningModule(LightningModule):
 
     def __init__(
         self,
-        batch_size_per_device: int,
+        batch_size_per_device: int = 4,
         hidden_size: int = 768,
         ibot_separate_head: bool = True,
         base_lr: float = 0.0005,  # Reduced from 0.004 as per issue #6
@@ -217,15 +216,6 @@ class DINOv2_3D_LightningModule(LightningModule):
 
         OFD, OFH, OFW = fix_arr.shape[2], fix_arr.shape[3], fix_arr.shape[4]
         OMD, OMH, OMW = fix_arr.shape[2], fix_arr.shape[3], fix_arr.shape[4]
-        scale_factor = 2
-
-        # fix_arr = nn.functional.interpolate(fix_arr, size=(OFD * scale_factor, OFH * scale_factor, OFW * scale_factor), mode="trilinear", align_corners=False)
-        # mov_arr = nn.functional.interpolate(mov_arr, size=(OMD * scale_factor, OMH * scale_factor, OMW * scale_factor), mode="trilinear", align_corners=False)
-
-        # fix_arr = resize(fix_arr.squeeze().cpu(), (OFD * scale_factor, OFH * scale_factor, OFW * scale_factor), anti_aliasing=True)
-        # mov_arr = resize(mov_arr.squeeze().cpu(), (OFD * scale_factor, OFH * scale_factor, OFW * scale_factor), anti_aliasing=True)
-        # fix_arr = torch.from_numpy(fix_arr).unsqueeze(0).unsqueeze(0).cuda()
-        # mov_arr = torch.from_numpy(mov_arr).unsqueeze(0).unsqueeze(0).cuda()
 
         FD, FH, FW = fix_arr.shape[2], fix_arr.shape[3], fix_arr.shape[4]
         MD, MH, MW = mov_arr.shape[2], mov_arr.shape[3], mov_arr.shape[4]
@@ -247,6 +237,10 @@ class DINOv2_3D_LightningModule(LightningModule):
         fix_feature = self.model.student_backbone(fix_arr).squeeze().cpu().numpy()
         mov_feature = self.model.student_backbone(mov_arr).squeeze().cpu().numpy()
 
+        if self.output_dir:
+            np.save(os.path.join(self.output_dir, os.path.basename(self.trainer.datamodule.val_dataset.dataset.data[batch_idx]["fixed"])[:-7] + "_" + "fixed_features.npy"), fix_feature)
+            np.save(os.path.join(self.output_dir, os.path.basename(self.trainer.datamodule.val_dataset.dataset.data[batch_idx]["moving"])[:-7] + "_" + "moving_features.npy"), mov_feature)
+
         all_features = np.concatenate((mov_feature[1:, :], fix_feature[1:, :]), axis=0)
 
         # PCA with 3 channels for visualization
@@ -256,9 +250,6 @@ class DINOv2_3D_LightningModule(LightningModule):
         fix_pca = reduced_patches[PMD * PMH * PMW:, :]
         mov_pca = mov_pca.reshape([PMD, PMH, PMW, -1])
         fix_pca = fix_pca.reshape([PFD, PFH, PFW, -1])
-
-        # mov_pca_rescaled = resize(mov_pca, (OMD, OMH, OMW, 3), anti_aliasing=True)
-        # fix_pca_rescaled = resize(fix_pca, (OFD, OFH, OFW, 3), anti_aliasing=True)
 
         fix_pca = fix_pca.unsqueeze(0).permute(0, 4, 1, 2, 3).cuda()
         mov_pca = mov_pca.unsqueeze(0).permute(0, 4, 1, 2, 3).cuda()
@@ -290,9 +281,6 @@ class DINOv2_3D_LightningModule(LightningModule):
         mov_pca = mov_pca.reshape([PMD, PMH, PMW, -1])
         fix_pca = fix_pca.reshape([PFD, PFH, PFW, -1])
 
-        # mov_pca_rescaled = resize(mov_pca, (OMD, OMH, OMW, 12), anti_aliasing=True)
-        # fix_pca_rescaled = resize(fix_pca, (OFD, OFH, OFW, 12), anti_aliasing=True)
-
         fix_pca = fix_pca.unsqueeze(0).permute(0, 4, 1, 2, 3).cuda()
         mov_pca = mov_pca.unsqueeze(0).permute(0, 4, 1, 2, 3).cuda()
         fix_pca_rescaled = nn.functional.interpolate(fix_pca, size=(OFD, OFH, OFW), mode="trilinear", align_corners=False)
@@ -300,24 +288,23 @@ class DINOv2_3D_LightningModule(LightningModule):
         fix_pca_rescaled = fix_pca_rescaled.permute(0, 2, 3, 4, 1).squeeze().cpu().numpy()
         mov_pca_rescaled = mov_pca_rescaled.permute(0, 2, 3, 4, 1).squeeze().cpu().numpy()
 
-        # mov_pca_rescaled = (mov_pca_rescaled - mov_pca_rescaled.min()) / (mov_pca_rescaled.max() - mov_pca_rescaled.min())
-        # fix_pca_rescaled = (fix_pca_rescaled - fix_pca_rescaled.min()) / (fix_pca_rescaled.max() - fix_pca_rescaled.min())
-
         """ConvexAdam optimization"""
-        print('\nStarting ConvexAdam optimization')
+        print('Starting ConvexAdam optimization')
 
         grid_sp_adam = 2
         smooth_weight = 2
+        grid_sp_adam = 4
+        smooth_weight = 0.5
         num_iter = 1000
-        lr = 3
-        iter_smooth_kernel = 7
-        iter_smooth_num = 5
+        lr = 0.2
+        iter_smooth_kernel = 3
+        iter_smooth_num = 3
         final_upsample = 1
 
         with torch.enable_grad():
-            disp, dice = convex_adam_3d_param(
-                fix_pca_rescaled,
-                mov_pca_rescaled,
+            disp = convex_adam_3d_param(
+                fix_pca_rescaled * 0.1,
+                mov_pca_rescaled * 0.1,
                 fix_lbs,
                 mov_lbs,
                 loss_func="SSD",
@@ -332,51 +319,20 @@ class DINOv2_3D_LightningModule(LightningModule):
                 final_upsample=final_upsample
             )
 
-        self.log("val_dice", dice.mean().item(), prog_bar=True, on_step=False, on_epoch=True)
-
         sdjlog, fold_ratio = jacobian_metrics(torch.tensor(disp).permute(3, 0, 1, 2).unsqueeze(0))
         print(f'SDJLog: {sdjlog}, FoldRatio: {fold_ratio}')
-        self.sdjlog.append(sdjlog)
-        self.fold_ratio.append(fold_ratio)
-
-        self.kidney_left_dice.append(dice[0].item())
-        self.kidney_right_dice.append(dice[1].item())
-        self.liver_dice.append(dice[2].item())
-        self.spleen_dice.append(dice[3].item())
-        self.mean_dice.append(dice.mean().item())
-
-        df = pd.DataFrame(
-            {
-                "init_mean_dice": self.init_mean_dice,
-                "mean_dice": self.mean_dice,
-                "sdjlog": self.sdjlog,
-                "fold_ratio": self.fold_ratio,
-                "init_kidney_left_dice": self.init_kidney_left_dice,
-                "init_kidney_right_dice": self.init_kidney_right_dice,
-                "init_liver_dice": self.init_liver_dice,
-                "init_spleen_dice": self.init_spleen_dice,
-                "kidney_left_dice": self.kidney_left_dice,
-                "kidney_right_dice": self.kidney_right_dice,
-                "liver_dice": self.liver_dice,
-                "spleen_dice": self.spleen_dice
-            }
-        )
+        self.log("val_sdjlog", sdjlog, on_step=False, on_epoch=True)
+        self.log("val_foldratio", fold_ratio, on_step=False, on_epoch=True)
 
         # warp moving image
         disp = np.moveaxis(disp, 3, 0)
-        mov_arr = mov_arr.cpu().numpy().squeeze()
         D, H, W = mov_arr.shape[-3], mov_arr.shape[-2], mov_arr.shape[-1]
         identity = np.meshgrid(np.arange(D), np.arange(H), np.arange(W), indexing='ij')
-        warped_arr = map_coordinates(mov_arr, identity + disp, order=0)
         warped_lbs = map_coordinates(mov_lbs.cpu().numpy().squeeze(), identity + disp, order=0)
 
         dice = dice_coeff(torch.Tensor(warped_lbs).unsqueeze(0).unsqueeze(0).contiguous().cuda(), fix_lbs.contiguous(), 5)
-        print(f"\nFinal dice: {dice.mean().item()}")
-
-        if self.output_dir:
-            name = os.path.basename(self.trainer.datamodule.val_dataset.dataset.data[batch_idx]["fixed"])[:-7] + "_" + os.path.basename(self.trainer.datamodule.val_dataset.dataset.data[batch_idx]["moving"])[:-7]
-            np.save(os.path.join(self.output_dir, name + "_warped.npy"), warped_arr)
-            np.save(os.path.join(self.output_dir, name + "_disp.npy"), disp)
+        print(f"Final dice: {dice.mean().item()}\n")
+        self.log("val_dice", dice.mean().item(), prog_bar=True, on_step=False, on_epoch=True)
 
         return dice.mean()
 
