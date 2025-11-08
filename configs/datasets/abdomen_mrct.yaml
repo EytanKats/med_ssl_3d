@@ -1,0 +1,1 @@
+data_module#val_dataset#dataset#data: "$monai.auto3dseg.datafold_read('/home/eytan/storage/staff/eytankats/projects/medssl3d/data/abdomenct_demo_data/dataset_mrct.json', basedir='/home/eytan/storage/staff/eytankats/data/abdomen_mrct', key='validation')[0]"
