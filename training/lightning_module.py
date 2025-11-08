@@ -291,8 +291,6 @@ class DINOv2_3D_LightningModule(LightningModule):
         """ConvexAdam optimization"""
         print('Starting ConvexAdam optimization')
 
-        grid_sp_adam = 2
-        smooth_weight = 2
         grid_sp_adam = 4
         smooth_weight = 0.5
         num_iter = 1000
