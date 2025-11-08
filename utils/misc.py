@@ -173,7 +173,7 @@ def compute_jacobian_determinant_3d(disp):
     return detJ
 
 
-def jacobian_metrics(disp):
+def jacobian_metrics(disp, fix_mask=None, warped_mask=None):
     """
     Compute Jacobian-based metrics: sdlogJ and % folding.
 
@@ -182,7 +182,14 @@ def jacobian_metrics(disp):
     Returns:
         dict with 'sdlogJ' and 'fold_percent'
     """
-    detJ = compute_jacobian_determinant_3d(disp)
+    detJ = compute_jacobian_determinant_3d(disp).squeeze()
+
+    # Get valid values of Jacobian determinant based on fixed and warped foreground masks
+    if fix_mask is not None and warped_mask is not None:
+        fix_trim = fix_mask[1:-1, 1:-1, 1:-1]
+        warped_trim = warped_mask[1:-1, 1:-1, 1:-1]
+        valid = (fix_trim > 0) & (warped_trim > 0)
+        detJ = detJ[valid]
 
     # Mask for positive determinants (valid Jacobians)
     pos_mask = detJ > 0
