@@ -413,6 +413,8 @@ def convex_adam_3d_param(feature_fixed,
                 seg_moving,
                 lambda_weight=1.25,
                 selected_niter=80,
+                disp_hw=4,
+                grid_sp=6,
                 grid_sp_adam=4, #feature map downsampling
                 loss_func='NCC',
                 lr=1,
@@ -437,7 +439,6 @@ def convex_adam_3d_param(feature_fixed,
     mask_moving = None
 
     H, W, D = features_fix.shape[2:]
-    print('optimization H, W, D', H, W, D)
 
     torch.cuda.synchronize()
     t0 = time.time()
@@ -445,9 +446,6 @@ def convex_adam_3d_param(feature_fixed,
     n_ch = features_fix.shape[1]
 
     if disp_init is None:
-        print('disp_init is None, using Convex optimization')
-        grid_sp = 6
-        disp_hw = 4
         features_fix_smooth = F.avg_pool3d(features_fix, grid_sp, stride=grid_sp)
         features_mov_smooth = F.avg_pool3d(features_mov, grid_sp, stride=grid_sp)
 
@@ -456,9 +454,10 @@ def convex_adam_3d_param(feature_fixed,
         ssd, ssd_argmin = correlate(features_fix_smooth, features_mov_smooth, disp_hw, grid_sp, (H, W, D), n_ch)
 
         # provide auxiliary mesh grid
-        disp_mesh_t = F.affine_grid(disp_hw * torch.eye(3, 4).cuda().half().unsqueeze(0),
-                                    (1, 1, disp_hw * 2 + 1, disp_hw * 2 + 1, disp_hw * 2 + 1), align_corners=True).permute(
-            0, 4, 1, 2, 3).reshape(3, -1, 1)
+        disp_mesh_t = F.affine_grid(
+            disp_hw * torch.eye(3, 4).cuda().half().unsqueeze(0),
+            (1, 1, disp_hw * 2 + 1, disp_hw * 2 + 1, disp_hw * 2 + 1),
+            align_corners=True).permute(0, 4, 1, 2, 3).reshape(3, -1, 1)
 
         # perform coupled convex optimisation
         disp_soft = coupled_convex(ssd, ssd_argmin, disp_mesh_t, grid_sp, (H, W, D))
@@ -564,12 +563,6 @@ def convex_adam_3d_param(feature_fixed,
             (loss + reg_loss).backward()
             optimizer.step()
 
-            dice = metrics.dice_coeff(seg_warped.contiguous(), seg_fixed.contiguous(), 5)
-
-            print("\roptimization iteration:{} {}: {} regLoss {}, dice {}".format(iter, loss_func, loss.item(), reg_loss.item(), dice.mean().item()), end="")
-
-
-
         fitted_grid = disp_sample.detach().permute(0, 4, 1, 2, 3)
         disp_hr = F.interpolate(fitted_grid * grid_sp_adam * final_upsample, size=(H*final_upsample, W*final_upsample, D*final_upsample), 
                                 mode='trilinear', align_corners=False)
@@ -583,14 +576,14 @@ def convex_adam_3d_param(feature_fixed,
     torch.cuda.synchronize()
     t1 = time.time()
     case_time = t1 - t0
-    print('case time: ', case_time)
+    print('Case time: ', case_time)
 
     x = disp_hr[0, 0, :, :, :].cpu().half().data.numpy()
     y = disp_hr[0, 1, :, :, :].cpu().half().data.numpy()
     z = disp_hr[0, 2, :, :, :].cpu().half().data.numpy()
     displacements = np.stack((x, y, z), 3).astype(float)
 
-    return displacements, dice
+    return displacements
 
 def convex_adam_3d_param_dataSmooth(feature_fixed,
                 feature_moving,
