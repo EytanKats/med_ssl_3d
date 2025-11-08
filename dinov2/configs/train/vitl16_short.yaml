@@ -1,0 +1,22 @@
+# this corresponds to the default config
+train:
+  dataset_path: ImageNet:split=TRAIN
+  batch_size_per_gpu: 64 #64
+  OFFICIAL_EPOCH_LENGTH: 950 #2140
+  num_workers: 64
+student:
+  block_chunks: 4
+optim:
+  epochs: 400
+crops:
+  global_crops_scale:
+  - 0.64
+  - 1.0
+  local_crops_number: 8
+  local_crops_scale:
+  - 0.25
+  - 0.64
+  global_crops_size: 224
+  local_crops_size: 96
+evaluation:
+  eval_period_iterations: 20000

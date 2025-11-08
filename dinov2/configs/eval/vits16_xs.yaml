@@ -1,0 +1,32 @@
+#MODEL:
+#  WEIGHTS: '/fast/songx/models/dinov2/dinov2_vitl14_reg4_pretrain.pth'
+dino:
+  head_n_prototypes: 65536
+  head_bottleneck_dim: 256 #default
+ibot:
+  separate_head: true
+  head_n_prototypes: 131072
+train:
+  batch_size_per_gpu: 76 #38 for large16
+  dataset_path: ImageNet22k
+  centering: sinkhorn_knopp
+  OFFICIAL_EPOCH_LENGTH: 1300 #689_875/gpu/batch
+student:
+  arch: vit_small
+  patch_size: 16
+  drop_path_rate: 0.4
+  ffn_layer: swiglufused
+  block_chunks: 4
+  num_register_tokens: 4
+teacher:
+  momentum_teacher: 0.994
+optim:
+  epochs: 100
+  weight_decay_end: 0.2
+  base_lr: 2.0e-04  # learning rate for a batch size of 1024
+  warmup_epochs: 10
+  layerwise_decay: 1.0
+crops:
+  local_crops_size: 96
+evaluation:
+  eval_period_iterations: 200
