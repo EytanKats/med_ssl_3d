@@ -225,14 +225,14 @@ class DINOv2_3D_LightningModule(LightningModule):
         PMD, PMH, PMW = MD // patch_size[0], MH // patch_size[1], MW // patch_size[1]
 
         # calculate initial dice
-        dice = dice_coeff(mov_lbs.contiguous(), fix_lbs.contiguous(), 5)
+        dice = dice_coeff(mov_lbs.contiguous(), fix_lbs.contiguous(), 5)  # 5 - nako, 14 - abdomenctct
         print(f"\nInitial dice: {dice.mean().item()}")
 
-        self.init_kidney_left_dice.append(dice[0].item())
-        self.init_kidney_right_dice.append(dice[1].item())
-        self.init_liver_dice.append(dice[2].item())
-        self.init_spleen_dice.append(dice[3].item())
-        self.init_mean_dice.append(dice.mean().item())
+        # self.init_kidney_left_dice.append(dice[0].item())
+        # self.init_kidney_right_dice.append(dice[1].item())
+        # self.init_liver_dice.append(dice[2].item())
+        # self.init_spleen_dice.append(dice[3].item())
+        # self.init_mean_dice.append(dice.mean().item())
 
         fix_feature = self.model.student_backbone(fix_arr).squeeze().cpu().numpy()
         mov_feature = self.model.student_backbone(mov_arr).squeeze().cpu().numpy()
@@ -285,14 +285,19 @@ class DINOv2_3D_LightningModule(LightningModule):
         mov_pca = mov_pca.unsqueeze(0).permute(0, 4, 1, 2, 3).cuda()
         fix_pca_rescaled = nn.functional.interpolate(fix_pca, size=(OFD, OFH, OFW), mode="trilinear", align_corners=False)
         mov_pca_rescaled = nn.functional.interpolate(mov_pca, size=(OMD, OMH, OMW), mode="trilinear", align_corners=False)
+
         fix_pca_rescaled = fix_pca_rescaled.permute(0, 2, 3, 4, 1).squeeze().cpu().numpy()
         mov_pca_rescaled = mov_pca_rescaled.permute(0, 2, 3, 4, 1).squeeze().cpu().numpy()
+
+        if self.output_dir:
+            np.save(os.path.join(self.output_dir, os.path.basename(self.trainer.datamodule.val_dataset.dataset.data[batch_idx]["fixed"])[:-7] + "_" + "fixed_features_pca.npy"), fix_pca_rescaled)
+            np.save(os.path.join(self.output_dir, os.path.basename(self.trainer.datamodule.val_dataset.dataset.data[batch_idx]["moving"])[:-7] + "_" + "moving_features_pca.npy"), mov_pca_rescaled)
 
         """ConvexAdam optimization"""
         print('Starting ConvexAdam optimization')
 
         grid_sp_adam = 4
-        smooth_weight = 0.5
+        smooth_weight = 0.12  # 0.12 - nako, 0.05 - ct
         num_iter = 1000
         lr = 0.2
         iter_smooth_kernel = 3
@@ -305,6 +310,7 @@ class DINOv2_3D_LightningModule(LightningModule):
                 mov_pca_rescaled * 0.1,
                 fix_lbs,
                 mov_lbs,
+                disp_hw=1,
                 loss_func="SSD",
                 grid_sp_adam=grid_sp_adam,
                 lambda_weight=smooth_weight,
@@ -328,7 +334,7 @@ class DINOv2_3D_LightningModule(LightningModule):
         identity = np.meshgrid(np.arange(D), np.arange(H), np.arange(W), indexing='ij')
         warped_lbs = map_coordinates(mov_lbs.cpu().numpy().squeeze(), identity + disp, order=0)
 
-        dice = dice_coeff(torch.Tensor(warped_lbs).unsqueeze(0).unsqueeze(0).contiguous().cuda(), fix_lbs.contiguous(), 5)
+        dice = dice_coeff(torch.Tensor(warped_lbs).unsqueeze(0).unsqueeze(0).contiguous().cuda(), fix_lbs.contiguous(), 5)  # 5 - nako, 14 - abdomenctct
         print(f"Final dice: {dice.mean().item()}\n")
         self.log("val_dice", dice.mean().item(), prog_bar=True, on_step=False, on_epoch=True)
 
@@ -486,6 +492,14 @@ class DINOv2_3D_LightningModule(LightningModule):
         # Remove manual synchronization - it's causing the hangups
         # DDP will handle this automatically after the backward pass
         return super().on_train_batch_end(outputs, batch, batch_idx)
+
+    def on_train_epoch_end(self):
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+
+    def on_validation_epoch_end(self):
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
 
     def _sync_teacher_parameters(self):
         """Synchronize teacher parameters across all DDP processes."""
