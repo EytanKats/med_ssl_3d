@@ -22,6 +22,7 @@ from monai.transforms import (
     RandScaleIntensity,
     RandShiftIntensity,
     RandGaussianNoise,
+    ScaleIntensityRange
 )
 
 from utils.gin import gin_aug
@@ -235,6 +236,13 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
 
 
     def forward_teacher(self, x, mask=None):
+
+        # for i in range(x.shape[0]):
+        #     low = torch.randint(low=-1000, high=-199, size=(1,)).item()
+        #     high = torch.randint(low=200, high=1001, size=(1,)).item()
+        #     intensity_scale = ScaleIntensityRange(a_min=low, a_max=high, b_min=0.0, b_max=1.0, clip=True)
+        #     x[i] = intensity_scale(x[i])
+
         features = self.teacher_backbone(x)
         cls_token = features[:, 0]
         features = features if mask is None else features[mask]
@@ -243,6 +251,12 @@ class DINOv2_3D_Meta_Architecture(nn.Module):
     def forward_student(self, x, mask=None):
 
         for i in range(x.shape[0]):
+
+            # low = torch.randint(low=-1000, high=-199, size=(1,)).item()
+            # high = torch.randint(low=200, high=1001, size=(1,)).item()
+            # intensity_scale = ScaleIntensityRange(a_min=low, a_max=high, b_min=0.0, b_max=1.0, clip=True)
+            # x[i] = intensity_scale(x[i])
+
             x[i] = self.intensity_aug(x[i])
 
             if self.apply_gin:
