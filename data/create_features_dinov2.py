@@ -143,7 +143,8 @@ def encode_3D_gap(
 # Paths to configuration files
 CONFIGURATION = [
     '/home/eytan/projects/medical_ssl_3d/configs/evaluate_dinov2.yaml',
-    '/home/eytan/projects/medical_ssl_3d/configs/datasets/nako_evaluation_data.yaml'
+    # '/home/eytan/projects/medical_ssl_3d/configs/datasets/nako_evaluation_data.yaml'
+    '/home/eytan/projects/medical_ssl_3d/configs/datasets/abdomen_ctct.yaml'
 ]
 
 # Parse configuration files and import project as a module
@@ -174,11 +175,15 @@ for data_idx, data in enumerate(data_loader):
     # Preprocess data
     fix_arr = data['fixed'].squeeze().numpy()
     mov_arr = data['moving'].squeeze().numpy()
-    mov_arr, fix_arr, slices_to_keep_indices, orig_chunked_shape = case_preprocess(mov_arr, fix_arr)
+    # mov_arr, fix_arr, slices_to_keep_indices, orig_chunked_shape = case_preprocess(mov_arr, fix_arr)
 
     # Extract and save features
-    mov_feature = encode_3D_gap(mov_arr, model)
-    fix_feature = encode_3D_gap(fix_arr, model)
+    fixed_output_path = os.path.join(output_dir, os.path.basename(fixed_path)[:-7] + "_" + "fixed_features.npy")
+    if not os.path.exists(fixed_output_path):
+        fix_feature = encode_3D_gap(fix_arr, model)
+        np.save(fixed_output_path, fix_feature)
 
-    np.save(os.path.join(output_dir, os.path.basename(fixed_path)[:-7] + "_" + "fixed_features.npy"), fix_feature)
-    np.save(os.path.join(output_dir, os.path.basename(moving_path)[:-7] + "_" + "moving_features.npy"), mov_feature)
+    mov_output_path = os.path.join(output_dir, os.path.basename(moving_path)[:-7] + "_" + "moving_features.npy")
+    if not os.path.exists(mov_output_path):
+        mov_feature = encode_3D_gap(mov_arr, model)
+        np.save(mov_output_path, mov_feature)
