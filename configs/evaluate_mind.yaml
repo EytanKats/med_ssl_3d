@@ -1,18 +1,35 @@
 # IO
 project: /home/eytan/projects/medical_ssl_3d
 labels_file: "/home/eytan/storage/staff/eytankats/projects/medssl3d/data/nako_30/nako_labels.json"
-output_dir: "/home/eytan/storage/staff/eytankats/projects/medssl3d/experiments/results/mind/nako_validation_registration"
-save_artifacts: False
+#labels_file: "/home/eytan/storage/staff/eytankats/projects/medssl3d/data/abdomenct_demo_data/abdomenctct_labels.json"
+output_dir: "/home/eytan/storage/staff/eytankats/projects/medssl3d/experiments/results/evaluation/mind/abdomenctct_registration"
+save_artifacts: True
 
 # Method
 method: "mind"
 
 # Registration
+
+# NAKO ----------------------
+#use_preregistration: False
+#num_iter: 1000
+#lr: 0.2
+#smooth_weight: 1.0
+#disp_hw: 1
+#grid_sp: 6
+#grid_sp_adam: 4
+#iter_smooth_kernel: 3
+#iter_smooth_num: 3
+#final_upsample: 1
+#loss_func: "SSD"
+#magnitute_scale: 3.0
+
+# ABDOMENCTCT ----------------------
 use_preregistration: False
 num_iter: 1000
 lr: 0.2
 smooth_weight: 1.0
-disp_hw: 4
+disp_hw: 1
 grid_sp: 6
 grid_sp_adam: 4
 iter_smooth_kernel: 3
@@ -36,10 +53,17 @@ data_module:
           image_only: True
         - _target_: monai.transforms.EnsureChannelFirstd
           keys: ["fixed", "moving" , "label_fixed", "label_moving"]
-        - _target_: monai.transforms.ScaleIntensityRangePercentilesd
+#        - _target_: monai.transforms.ScaleIntensityRangePercentilesd
+#          keys: ["fixed", "moving"]
+#          lower: 1
+#          upper: 99
+#          b_min: 0.0
+#          b_max: 1.0
+#          clip: True
+        - _target_: monai.transforms.ScaleIntensityRanged
           keys: ["fixed", "moving"]
-          lower: 1
-          upper: 99
+          a_min: -450
+          a_max: 450
           b_min: 0.0
           b_max: 1.0
           clip: True

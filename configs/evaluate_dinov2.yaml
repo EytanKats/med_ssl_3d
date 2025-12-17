@@ -1,21 +1,22 @@
 # IO
 project: /home/eytan/projects/medical_ssl_3d
 labels_file: "/home/eytan/storage/staff/eytankats/projects/medssl3d/data/nako_30/nako_labels.json"
-output_dir: "/home/eytan/storage/staff/eytankats/projects/medssl3d/experiments/results/dinov2/nako_validation_registration"
+#labels_file: "/home/eytan/storage/staff/eytankats/projects/medssl3d/data/abdomenct_demo_data/abdomenctct_labels.json"
+output_dir: "/home/eytan/storage/staff/eytankats/projects/medssl3d/experiments/results/evaluation/dinov2/nako_registration"
 save_artifacts: True
 
 # Method
 method: "dinov2"
 
 # Features
-features_dir: "/home/eytan/storage/staff/eytankats/projects/medssl3d/experiments/results/dinov2/nako_validation_features"
+features_dir: "/home/eytan/storage/staff/eytankats/projects/medssl3d/experiments/results/evaluation/dinov2/nako_features"
 feature_shape: [64, 64]
 
 # Registration
 use_preregistration: False
 num_iter: 1000
 lr: 0.2
-smooth_weight: 3
+smooth_weight: 1
 disp_hw: 4
 grid_sp: 6
 grid_sp_adam: 4
@@ -47,5 +48,12 @@ data_module:
           b_min: 0.0
           b_max: 1.0
           clip: True
+#        - _target_: monai.transforms.ScaleIntensityRanged
+#          keys: [ "fixed", "moving" ]
+#          a_min: -450
+#          a_max: 450
+#          b_min: 0.0
+#          b_max: 1.0
+#          clip: True
         - _target_: monai.transforms.ToTensord
           keys: ["fixed", "moving" , "label_fixed", "label_moving"]
