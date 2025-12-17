@@ -413,7 +413,7 @@ def convex_adam_3d_param(feature_fixed,
                 seg_moving,
                 lambda_weight=1.25,
                 selected_niter=80,
-                disp_hw=4,
+                disp_hw=4, # set to '1' to supress tailoring to MIND features
                 grid_sp=6,
                 grid_sp_adam=4, #feature map downsampling
                 loss_func='NCC',
