@@ -1,0 +1,2 @@
+ data_module#val_dataset#dataset#data: "$monai.auto3dseg.datafold_read('/home/eytan/storage/staff/eytankats/projects/medssl3d/data/abdomenct_demo_data/dataset_popi.json', basedir='/home/eytan/storage/staff/mattiasheinrich/POPI/bl/crop', key='validation')[0]"
+# data_module#val_dataset#data: "$monai.auto3dseg.datafold_read('/home/eytan/storage/staff/eytankats/projects/medssl3d/data/abdomenct_demo_data/popi.json', basedir='/home/eytan/storage/staff/mattiasheinrich/POPI/bh/crop', key='validation')[0]"
