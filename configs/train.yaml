@@ -58,9 +58,11 @@ lightning_module:
     mask_ratio_max: 0.7
     sampling: 'random'
     weight_decay: 0.04
-    apply_gin: False
-    ckpt_path: "/home/eytan/storage/staff/eytankats/projects/medssl3d/experiments/patch_4/checkpoints/model_epoch=1534.ckpt"
-    output_dir: "$'/home/eytan/storage/staff/eytankats/projects/medssl3d/experiments/' + @run_name + '/val_artifacts'"
+    apply_gin: True
+#    ckpt_path: "/home/eytan/storage/staff/eytankats/projects/medssl3d/experiments/patch_4_gin_nako_tsct_fine-tuning/checkpoints/best-epoch=1029-val_dice=0.3820.ckpt"
+    ckpt_path: ""
+#    output_dir: "$'/home/eytan/storage/staff/eytankats/projects/medssl3d/experiments/' + @run_name"
+    output_dir: ""
     backbone:
 
 data_module:
