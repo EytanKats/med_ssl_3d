@@ -3,6 +3,7 @@ import torch
 import numpy as np
 from PIL import Image
 
+
 def plot_to_image(fig):
     """Convert a matplotlib figure to a numpy image."""
     buf = io.BytesIO()
@@ -12,6 +13,7 @@ def plot_to_image(fig):
     image = np.array(image)
     buf.close()
     return image
+
 
 def custom_enumerate(sequence, start=0, step=1):
     n = len(sequence)
@@ -38,6 +40,7 @@ def calculate_total_difference_for_translation(bestMatch, translation, fixed_set
     total_difference = np.sum(differences)
 
     return total_difference
+
 
 def find_optimal_translation_within_range(bestMatch, search_range, fixed_set_size):
             optimal_translation = None
@@ -75,6 +78,7 @@ def cosine_similarity_batch(set1, set2):
     cosine_similarity = np.mean(dot_products, axis=(2, 3))
 
     return cosine_similarity
+
 
 def calculate_best_match_cls(set1, set2, feat_sliceNum, mode='l2'):
 
@@ -136,7 +140,6 @@ def calculate_best_match_patchT(set1, set2, mode='l2'):
     else:
         closest_feature = np.argmax(dist, axis=1)
     return closest_feature
-
 
 
 def compute_jacobian_determinant_3d(disp):
