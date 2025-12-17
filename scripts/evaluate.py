@@ -1,3 +1,6 @@
+import sys
+sys.path.append(".")
+
 import os
 import ants
 import json
@@ -6,11 +9,12 @@ import numpy as np
 import pandas as pd
 
 from monai.bundle import ConfigParser
-from monai.transforms import ScaleIntensityRange, GaussianSmooth, ThresholdIntensity, ToTensor
+from monai.transforms import GaussianSmooth
 
 from scipy.ndimage import binary_fill_holes
 from scipy.ndimage import label as scipy_label
-from skimage.morphology import remove_small_objects, binary_closing, ball
+from skimage.morphology import binary_closing, ball, binary_opening
+from skimage.measure import regionprops
 
 import matplotlib.pyplot as plt
 
@@ -205,11 +209,31 @@ def extract_foreground_mask(volume, smooth_sigma=1.0):
 
     return mask.astype(np.uint8)
 
+def extract_foreground_mask_ct(ct_volume):
+
+    # 1. Threshold: everything above ~-400 HU is likely body/tissue
+    ct_volume = ct_volume.squeeze().numpy()
+    mask = ct_volume > 0.2
+
+    # 2. Morphological cleanup (close small holes, remove isolated noise)
+    mask = binary_closing(mask, footprint=np.ones((5, 5, 5)))
+    mask = binary_opening(mask, footprint=np.ones((3, 3, 3)))
+    mask = binary_fill_holes(mask)
+
+    # 3. Keep only the largest connected component (the patient body)
+    labeled_mask, num_features = scipy_label(mask)
+    if num_features > 1:
+        regions = regionprops(labeled_mask)
+        largest_region = max(regions, key=lambda r: r.area)
+        mask = labeled_mask == largest_region.label
+
+    return mask.astype(np.uint8)
 
 # Paths to configuration files
 CONFIGURATION = [
     '/home/eytan/projects/medical_ssl_3d/configs/evaluate_medssl.yaml',
     '/home/eytan/projects/medical_ssl_3d/configs/datasets/nako_evaluation_data.yaml'
+    # '/home/eytan/projects/medical_ssl_3d/configs/datasets/abdomen_ctct.yaml'
 ]
 
 # Parse configuration files and import project as a module
@@ -287,6 +311,7 @@ for data_idx, data in enumerate(data_loader):
     fix_img = data['fixed']
     fix_lbl = data['label_fixed']
     fix_mask = extract_foreground_mask(fix_img)
+    # fix_mask = extract_foreground_mask_ct(fix_img)
 
     # Do ants "pre-registration" and substitute moving image and label with warped ones
     if use_preregistration:
@@ -297,11 +322,13 @@ for data_idx, data in enumerate(data_loader):
         mov_img = data['moving']
         mov_lbl = data['label_moving']
     mov_mask = extract_foreground_mask(mov_img)
+    # mov_mask = extract_foreground_mask_ct(mov_img)
 
     # Derive number of labels
     lbl_num = int((mov_lbl.max() + 1).item())
 
     if method == "mind":  # Get MIND features
+
         mov_feature =  MINDSSC(mov_img.cuda(),3,2).detach().cpu().numpy()
         fix_feature = MINDSSC(fix_img.cuda(),3,2).detach().cpu().numpy()
 
