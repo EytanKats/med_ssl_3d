@@ -1,6 +1,7 @@
 # This version of the YAML uses processed patches
 project: /home/eytan/projects/medical_ssl_3d
-run_name: "dinov2_pretrain_freezelastlayerfor1500steps_baselr0.001_warmupteacherfor15000steps_globalcrops0.8-0.1_patches16_epochs9000_batch6_maskingbug"
+run_name: "patch_4_gin_nako_tsct_fine-tuning_part2"
+#run_name: "results/evaluation/medssl/popi_features/bl"
 img_size: [128, 128, 128]
 hidden_size: 180 # 864, 180
 patch_size: [4, 4, 4] # [8, 8, 8], [4, 4, 4]
@@ -8,7 +9,7 @@ patch_size: [4, 4, 4] # [8, 8, 8], [4, 4, 4]
 trainer:
   _target_: pytorch_lightning.Trainer
   benchmark: True
-  max_epochs: 9000
+  max_epochs: 3000  # 3000
   accelerator: gpu
   # strategy: ddp_find_unused_parameters_true
   enable_model_summary: False
@@ -18,6 +19,7 @@ trainer:
   num_sanity_val_steps: 1
   check_val_every_n_epoch: 25
   precision: 16-mixed
+#  accumulate_grad_batches: 5
   #  devices: 3
   detect_anomaly: False
   # sync_batchnorm: True
@@ -38,23 +40,23 @@ trainer:
 
 lightning_module:
     _target_: project.training.lightning_module.DINOv2_3D_LightningModule
-    batch_size_per_device: 6
+    batch_size_per_device: 4
     hidden_size: "%hidden_size"
     ibot_separate_head: True
-    base_lr: 0.001
+    base_lr: 0.000006 # 0.000006, 0.001 - original
     layer_decay: 0.9
     gradient_clip_val: 3.0
-    teacher_temp_warmup_epochs: 300
-    teacher_temp_min: 0.04
-    teacher_temp_max: 0.055  # 0.07
-    momentum_start_value: 0.992
-    momentum_end_value: 1.0
+    teacher_temp_warmup_epochs: 1000 # 1000, 300
+    teacher_temp_min: 0.04  # 0.04
+    teacher_temp_max: 0.07  # 0.07
+    momentum_start_value: 0.992  # 0.992
+    momentum_end_value: 0.998  # 1.0, 0.998
     freeze_last_layer_epochs: 0  # 30
-    projection_dim: 8192 # 65536
-    ibot_projection_dim: 8192 # 65536
+    projection_dim: 8192 # 65536, 8192
+    ibot_projection_dim: 8192 # 65536, 8192
     mask_ratio_min: 0.4
     mask_ratio_max: 0.7
-    sampling: 'entropy'
+    sampling: 'random'
     weight_decay: 0.04
     apply_gin: False
     ckpt_path: "/home/eytan/storage/staff/eytankats/projects/medssl3d/experiments/patch_4/checkpoints/model_epoch=1534.ckpt"
@@ -64,7 +66,7 @@ lightning_module:
 data_module:
   _target_: project.training.data_module.DataModule
   num_workers: 12
-  batch_size: 6
+  batch_size: 4
   pin_memory: True
   drop_last: True
   train_dataset:
@@ -90,7 +92,7 @@ data_module:
             - _target_: torchvision.transforms.Lambda
               lambd: "$lambda x: x['image'].as_tensor()"
             - _target_: project.transforms.dinov2_aug.DINOv2Augmentation3D
-              global_view_scale: [0.8, 1.0]
+              global_view_scale: [0.6, 1.0]
               global_view_size: "$@img_size[0]"
               local_view_scale: [0.3, 1.0]
               local_view_size: "$@img_size[0]//2"
@@ -111,11 +113,18 @@ data_module:
           - _target_: monai.transforms.EnsureChannelFirstd
             keys: [ "fixed", "moving" , "label_fixed", "label_moving"]
           - _target_: monai.transforms.ScaleIntensityRangePercentilesd
-            keys: [ "fixed", "moving" ]
-            lower: 1
-            upper: 99
+            keys: [ "fixed", "moving"]
+            lower: 1  # 1
+            upper: 99  # 99
             b_min: 0.0
             b_max: 1.0
             clip: True
+#          - _target_: monai.transforms.ScaleIntensityRanged
+#            keys: ["fixed", "moving"]
+#            a_min: -450
+#            a_max: 450
+#            b_min: 0.0
+#            b_max: 1.0
+#            clip: True
           - _target_: torchvision.transforms.Lambda
             lambd: "$lambda x: [x['fixed'].as_tensor(), x['moving'].as_tensor(), x['label_fixed'].as_tensor(), x['label_moving'].as_tensor()]"
